@@ -1,7 +1,14 @@
-".vs/" 
-"*.user" 
-"__pycache__/" 
-"*.pyc" 
-"env/" 
-"*.log" 
-"*.tmp" 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Visual Studio / VS Code
+.vs/
+*.vsidx
+*.user
+*.suo
+
+# Otros temporales
+*.log
+*.tmp
