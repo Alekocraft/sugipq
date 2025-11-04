@@ -1,0 +1,338 @@
+{% extends "base.html" %}
+
+{% block title %}Crear Solicitud{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Crear Nueva Solicitud</h1>
+
+    <!-- Mostrar mensajes de error -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    {% if 'Límite mensual' in message %}
+    <div class="alert alert-danger alert-dismissible fade show">
+        <h5>⚠️ Límite Mensual Excedido</h5>
+        <p>{{ message }}</p>
+        <p><strong>💡 Solución:</strong> Espere al próximo mes o contacte a la sede principal.</p>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% elif 'Stock insuficiente' in message %}
+    <div class="alert alert-warning alert-dismissible fade show">
+        <h5>⚠️ Stock Insuficiente</h5>
+        <p>{{ message }}</p>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% else %}
+    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Formulario de Solicitud</h5>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/solicitudes/crear">
+                <div class="row">
+                    <div class="col-md-6">
+                        <!-- Oficina Solicitante - Campo no editable -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <strong>Oficina Solicitante:</strong>
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   value="{{ session.oficina_nombre }}"
+                                   readonly
+                                   style="background-color: #f8f9fa; cursor: not-allowed;">
+                            <input type="hidden"
+                                   name="oficina_id"
+                                   value="{{ session.oficina_id }}">
+                            <small class="form-text text-muted">
+                                Oficina asignada a su usuario (no editable)
+                            </small>
+                        </div>
+
+                        <!-- Material -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <strong>Material Solicitado:</strong>
+                            </label>
+                            <select class="form-select" id="material_id" name="material_id" required>
+                                <option value="">Seleccione un material...</option>
+                                {% if materiales %}
+                                {% for material in materiales %}
+                                <option value="{{ material.id }}"
+                                        data-stock="{{ material.cantidad }}"
+                                        data-valor="{{ material.valor_unitario }}"
+                                        data-imagen="{{ material.ruta_imagen if material.ruta_imagen else '' }}"
+                                        data-nombre="{{ material.nombre }}">
+                                    {{ material.nombre }} - Stock: {{ material.cantidad }}
+                                </option>
+                                {% endfor %}
+                                {% else %}
+                                <option value="" disabled>No hay materiales disponibles</option>
+                                {% endif %}
+                            </select>
+                            {% if not materiales %}
+                            <div class="alert alert-warning mt-2">
+                                <small>No se encontraron materiales disponibles. Contacte al administrador.</small>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Porcentaje Oficina - MOVIDO A LA IZQUIERDA -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <strong>Porcentaje que Asume la Oficina (%):</strong>
+                            </label>
+                            <input type="number"
+                                   class="form-control"
+                                   id="porcentaje_oficina"
+                                   name="porcentaje_oficina"
+                                   min="1"
+                                   max="100"
+                                   step="1"
+                                   value="100"
+                                   required
+                                   placeholder="Ej: 100, 50, 25">
+                            <small class="form-text text-muted">
+                                Porcentaje del costo que asume la oficina (1-100%)
+                            </small>
+                        </div>
+
+                        <!-- Cantidad Solicitada -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <strong>Cantidad Solicitada:</strong>
+                            </label>
+                            <input type="number"
+                                   class="form-control"
+                                   id="cantidad_solicitada"
+                                   name="cantidad_solicitada"
+                                   min="1"
+                                   max="1000"
+                                   required
+                                   placeholder="Ingrese la cantidad">
+                            <small class="form-text text-muted">
+                                Límite máximo: 1000 unidades por solicitud
+                            </small>
+                        </div>
+
+                        <!-- Observación - NUEVO CAMPO -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <strong>Observación:</strong>
+                            </label>
+                            <textarea class="form-control"
+                                      id="observacion"
+                                      name="observacion"
+                                      rows="3"
+                                      minlength="15"
+                                      maxlength="500"
+                                      required
+                                      placeholder="Ingrese observaciones adicionales sobre la solicitud (mínimo 15 caracteres, máximo 500 caracteres)"></textarea>
+                            <small class="form-text text-muted">
+                                Mínimo 15 caracteres, máximo 500 caracteres
+                            </small>
+                            <div class="invalid-feedback">
+                                La observación debe tener al menos 15 caracteres
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <!-- Información del Material Seleccionado -->
+                        <div class="card bg-light mt-3">
+                            <div class="card-header">
+                                <strong>Información del Material</strong>
+                            </div>
+                            <div class="card-body">
+                                <div id="imagen-material" class="text-center mb-3" style="display: none;">
+                                    <img id="imagen-material-src" src="" alt="Imagen del material"
+                                         class="img-fluid rounded" style="max-height: 150px;">
+                                </div>
+                                <div id="info-material" class="text-muted">
+                                    {% if materiales %}
+                                    Seleccione un material para ver información...
+                                    {% else %}
+                                    <span class="text-danger">No hay materiales disponibles para mostrar</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Resumen de la Solicitud -->
+                        <div class="card bg-info text-white mt-3">
+                            <div class="card-header">
+                                <strong>Resumen de la Solicitud</strong>
+                            </div>
+                            <div class="card-body">
+                                <div id="resumen-solicitud">
+                                    {% if materiales %}
+                                    Complete los campos para ver el resumen...
+                                    {% else %}
+                                    <span>No se pueden crear solicitudes sin materiales disponibles</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/dashboard" class="btn btn-secondary me-md-2">
+                                Cancelar
+                            </a>
+                            {% if materiales %}
+                            <button type="submit" class="btn btn-success">
+                                Crear Solicitud
+                            </button>
+                            {% else %}
+                            <button type="button" class="btn btn-success" disabled>
+                                No hay materiales disponibles
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const materialSelect = document.getElementById('material_id');
+        const cantidadInput = document.getElementById('cantidad_solicitada');
+        const porcentajeInput = document.getElementById('porcentaje_oficina');
+        const infoMaterial = document.getElementById('info-material');
+        const resumenSolicitud = document.getElementById('resumen-solicitud');
+        const imagenMaterialDiv = document.getElementById('imagen-material');
+        const imagenMaterialSrc = document.getElementById('imagen-material-src');
+
+        // Verificar si hay materiales disponibles
+        const hayMateriales = materialSelect.options.length > 1;
+
+        // Validación del porcentaje
+        porcentajeInput.addEventListener('blur', function () {
+            const valor = parseInt(this.value);
+            if (valor < 1) {
+                alert('El porcentaje debe ser como mínimo 1%');
+                this.value = 1;
+                this.focus();
+            } else if (valor > 100) {
+                alert('El porcentaje no puede ser mayor a 100%');
+                this.value = 100;
+                this.focus();
+            }
+        });
+
+        function actualizarInformacion() {
+            if (!hayMateriales) {
+                infoMaterial.innerHTML = '<span class="text-danger">No hay materiales disponibles para mostrar</span>';
+                resumenSolicitud.innerHTML = '<span>No se pueden crear solicitudes sin materiales disponibles</span>';
+                return;
+            }
+
+            const materialOption = materialSelect.options[materialSelect.selectedIndex];
+            const cantidad = parseInt(cantidadInput.value) || 0;
+            const porcentaje = parseFloat(porcentajeInput.value) || 0;
+
+            // Actualizar información del material
+            if (materialSelect.value) {
+                const stock = materialOption.getAttribute('data-stock');
+                const valor = materialOption.getAttribute('data-valor');
+                const imagen = materialOption.getAttribute('data-imagen');
+                const nombre = materialOption.getAttribute('data-nombre');
+                const valorNum = parseFloat(valor);
+                const stockNum = parseInt(stock);
+
+                // Mostrar u ocultar imagen
+                if (imagen && imagen !== 'None' && imagen !== '') {
+                    imagenMaterialSrc.src = '/static/' + imagen;
+                    imagenMaterialDiv.style.display = 'block';
+                } else {
+                    imagenMaterialDiv.style.display = 'none';
+                }
+
+                infoMaterial.innerHTML =
+                    '<strong>Material:</strong> ' + nombre + '<br>' +
+                    '<strong>Stock disponible:</strong> ' + stock + ' unidades<br>' +
+                    '<strong>Valor unitario:</strong> $' + valorNum.toFixed(2) + '<br>' +
+                    '<strong>Valor total disponible:</strong> $' + (valorNum * stockNum).toFixed(2);
+            } else {
+                imagenMaterialDiv.style.display = 'none';
+                infoMaterial.innerHTML = 'Seleccione un material para ver información detallada...';
+            }
+
+            // Actualizar resumen de la solicitud
+            if (materialSelect.value && cantidad > 0) {
+                const valor = materialOption.getAttribute('data-valor');
+                const valorNum = parseFloat(valor);
+                const valorTotal = valorNum * cantidad;
+                const valorOficina = valorTotal * (porcentaje / 100);
+                const valorSede = valorTotal - valorOficina;
+
+                resumenSolicitud.innerHTML =
+                    '<strong>Cantidad:</strong> ' + cantidad + ' unidades<br>' +
+                    '<strong>Valor total:</strong> $' + valorTotal.toFixed(2) + '<br>' +
+                    '<strong>Oficina asume (' + porcentaje + '%):</strong> $' + valorOficina.toFixed(2) + '<br>' +
+                    '<strong>Sede principal asume:</strong> $' + valorSede.toFixed(2);
+            } else {
+                resumenSolicitud.innerHTML = 'Complete los campos para ver el resumen...';
+            }
+        }
+
+        // Solo agregar event listeners si hay materiales
+        if (hayMateriales) {
+            materialSelect.addEventListener('change', actualizarInformacion);
+            cantidadInput.addEventListener('input', actualizarInformacion);
+            porcentajeInput.addEventListener('input', actualizarInformacion);
+
+            // Validación de stock
+            cantidadInput.addEventListener('blur', function () {
+                if (materialSelect.value) {
+                    const materialOption = materialSelect.options[materialSelect.selectedIndex];
+                    const stockDisponible = parseInt(materialOption.getAttribute('data-stock'));
+                    const cantidadSolicitada = parseInt(this.value);
+
+                    if (cantidadSolicitada > stockDisponible) {
+                        alert('Advertencia: La cantidad solicitada (' + cantidadSolicitada + ') excede el stock disponible (' + stockDisponible + ')');
+                        this.focus();
+                    }
+                }
+            });
+
+            // Inicializar información
+            actualizarInformacion();
+        }
+    });
+</script>
+
+<style>
+    .form-control:read-only {
+        background-color: #f8f9fa;
+        cursor: not-allowed;
+    }
+
+    .alert h5 {
+        margin-bottom: 0.5rem;
+    }
+
+    select:disabled {
+        background-color: #e9ecef;
+        cursor: not-allowed;
+    }
+</style>
+{% endblock %}

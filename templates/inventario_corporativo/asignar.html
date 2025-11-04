@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Asignar a Oficina{% endblock %}
+{% block content %}
+
+<div class="container-fluid fade-in">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0"><i class="fas fa-share-square"></i> Asignar "{{ producto.nombre }}"</h5>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Stock disponible:</strong> {{ producto.cantidad }} unidades
+                    </div>
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label class="form-label">Oficina</label>
+                            <select class="form-select" name="oficina_id" required>
+                                <option value="" disabled selected>Seleccione una oficina</option>
+                                {% for o in oficinas %}
+                                <option value="{{ o.id }}">{{ o.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Cantidad a asignar</label>
+                            <input type="number" class="form-control" name="cantidad" min="1" max="{{ producto.cantidad }}" placeholder="Máximo: {{ producto.cantidad }}" required>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <a href="/inventario-corporativo/{{ producto.id }}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Volver</a>
+                            <button class="btn btn-success"><i class="fas fa-check"></i> Confirmar asignación</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mt-3">
+                <div class="card-header bg-light"><strong>Historial reciente</strong></div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <thead><tr><th>Fecha</th><th>Acción</th><th>Oficina</th><th>Cant.</th><th>Usuario</th></tr></thead>
+                        <tbody>
+                            {% for h in historial[:10] %}
+                            <tr>
+                                <td>{{ h.Fecha.strftime('%d/%m/%Y %H:%M') if h.Fecha else '' }}</td>
+                                <td>
+                                    {% if h.Accion == 'ASIGNAR' %}
+                                    <span class="badge bg-success">Asignación</span>
+                                    {% elif h.Accion == 'BAJA_PRODUCTO' %}
+                                    <span class="badge bg-danger">Baja</span>
+                                    {% else %}
+                                    {{ h.Accion }}
+                                    {% endif %}
+                                </td>
+                                <td>{{ h.oficina or '-' }}</td>
+                                <td>{{ h.Cantidad }}</td>
+                                <td>{{ h.UsuarioAccion }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-center text-muted py-3">Sin movimientos registrados</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

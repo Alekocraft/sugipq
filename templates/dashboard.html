@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Sistema de Gestión{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container fade-in">
+    <!-- Encabezado -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="fw-bold" style="color: #A73493;"><i class="fas fa-tachometer-alt"></i> Dashboard Principal</h1>
+            <p class="text-muted">Resumen general del sistema de gestión de inventarios</p>
+        </div>
+    </div>
+
+    <!-- Bienvenida -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body bg-white rounded-3">
+            <h5 class="fw-semibold text-dark mb-2">🚀 Bienvenido, {{ session.usuario_nombre }}</h5>
+            <p class="text-muted mb-0">
+                <strong><i class="fas fa-shield-alt"></i> Rol:</strong> {{ session.rol }} |
+                <strong><i class="fas fa-building"></i> Oficina:</strong> {{ session.oficina_nombre }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Sección de módulos principales -->
+    <div class="row g-4 mb-4">
+
+        {% if session.rol in ['administrador', 'lider_inventario', 'oficina_principal'] %}
+        <!-- Material POP con modal -->
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm text-white text-center p-4"
+                 style="background-color: #A73493; cursor: pointer; transition: transform 0.2s;"
+                 data-bs-toggle="modal" data-bs-target="#modalMaterialPOP"
+                 onmouseover="this.style.transform='scale(1.03)'"
+                 onmouseout="this.style.transform='scale(1)'">
+                <h5 class="fw-bold mb-2"><i class="fas fa-bullhorn"></i> Material POP</h5>
+                <p class="mb-0">Gestión de materiales POP</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Inventario Corporativo -->
+        {% if session.rol in ['administrador','lider_inventario'] %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm text-white text-center p-4"
+                 style="background-color: #0098B1; cursor: pointer; transition: transform 0.2s;"
+                 data-bs-toggle="modal" data-bs-target="#modalInventarioCorporativo"
+                 onmouseover="this.style.transform='scale(1.03)'"
+                 onmouseout="this.style.transform='scale(1)'">
+                <h5 class="fw-bold mb-2"><i class="fas fa-warehouse"></i> Inventario Corporativo</h5>
+                <p class="mb-0">Gestión de productos corporativos</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Préstamo de Material -->
+        {% if session.rol in ['administrador', 'lider_inventario'] %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card border-0 shadow-sm text-white text-center p-4"
+                 style="background-color: #D9D9D9; color: #212529; cursor: pointer; transition: transform 0.2s;"
+                 onmouseover="this.style.transform='scale(1.03)'"
+                 onmouseout="this.style.transform='scale(1)'"
+                 data-bs-toggle="modal" data-bs-target="#modalPrestamos">
+                <h5 class="fw-bold mb-2"><i class="fas fa-exchange-alt" style="color:#A73493;"></i> Préstamo de Material</h5>
+                <p class="mb-0">Control y seguimiento de préstamos</p>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<!-- Modal: Material POP -->
+<div class="modal fade" id="modalMaterialPOP" tabindex="-1" aria-labelledby="modalMaterialPOPLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header" style="background-color: #A73493; color: #fff;">
+                <h5 class="modal-title fw-bold" id="modalMaterialPOPLabel"><i class="fas fa-bullhorn"></i> Material POP</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body" style="background-color: #F8F9FA;">
+                <div class="row g-4 mb-4">
+                    <!-- Materiales -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card border-0 shadow-sm text-center p-3 bg-white">
+                            <h6 class="fw-semibold"><i class="fas fa-box" style="color: #0098B1;"></i> Materiales</h6>
+                            <p class="display-6 fw-bold text-dark">{{ materiales|length }}</p>
+                            <a href="/materiales" class="btn btn-primary btn-sm">Gestionar</a>
+                        </div>
+                    </div>
+
+                    <!-- Oficinas -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card border-0 shadow-sm text-center p-3 bg-white">
+                            <h6 class="fw-semibold"><i class="fas fa-building" style="color: #0098B1;"></i> Oficinas</h6>
+                            <p class="display-6 fw-bold text-dark">{{ oficinas|length }}</p>
+                            <a href="/oficinas" class="btn btn-primary btn-sm">Ver</a>
+                        </div>
+                    </div>
+
+                    <!-- Solicitudes -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card border-0 shadow-sm text-center p-3 bg-white">
+                            <h6 class="fw-semibold"><i class="fas fa-clipboard-list" style="color: #0098B1;"></i> Solicitudes</h6>
+                            <p class="display-6 fw-bold text-dark">{{ solicitudes|length }}</p>
+                            <a href="/solicitudes" class="btn btn-primary btn-sm">Gestionar</a>
+                        </div>
+                    </div>
+
+                    <!-- Aprobadores -->
+                    <div class="col-xl-3 col-md-6">
+                        <div class="card stats-card border-0 shadow-sm text-center p-3 bg-white">
+                            <h6 class="fw-semibold"><i class="fas fa-user-check" style="color: #0098B1;"></i> Aprobadores</h6>
+                            <p class="display-6 fw-bold text-dark">{{ aprobadores|length }}</p>
+                            <a href="/aprobadores" class="btn btn-primary btn-sm">Ver</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Acciones Rápidas -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="fw-semibold mb-3" style="color: #A73493;"><i class="fas fa-bolt"></i> Acciones Rápidas</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            {% if session.rol in ['administrador', 'lider_inventario'] %}
+                            <a href="/materiales/crear" class="btn btn-primary"><i class="fas fa-plus"></i> Crear Material</a>
+                            {% endif %}
+                            <a href="/solicitudes/crear" class="btn btn-success"><i class="fas fa-edit"></i> Nueva Solicitud</a>
+                            <a href="/reportes" class="btn btn-info"><i class="fas fa-chart-bar"></i> Ver Reportes</a>
+                            {% if session.rol in ['aprobador', 'administrador', 'lider_inventario'] %}
+                            <a href="/solicitudes" class="btn btn-warning"><i class="fas fa-clipboard-check"></i> Revisar Pendientes</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="background-color: #D9D9D9;">
+                <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Inventario Corporativo -->
+<div class="modal fade" id="modalInventarioCorporativo" tabindex="-1" aria-labelledby="modalInventarioCorporativoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header" style="background-color: #0098B1; color: #fff;">
+                <h5 class="modal-title fw-bold" id="modalInventarioCorporativoLabel"><i class="fas fa-warehouse"></i> Inventario Corporativo</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body" style="background-color: #F8F9FA;">
+                <div class="row g-4 mb-4">
+                    <!-- Productos Totales -->
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card stats-card border-0 shadow-sm text-center p-3 bg-white">
+                            <h6 class="fw-semibold"><i class="fas fa-boxes" style="color: #0098B1;"></i> Productos Totales</h6>
+                            <p class="display-6 fw-bold text-dark" id="total-productos">0</p>
+                            <a href="/inventario-corporativo" class="btn btn-primary btn-sm">Ver Todos</a>
+                        </div>
+                    </div>
+
+                    <!-- Sede Principal -->
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card stats-card border-0 shadow-sm text-center p-3 bg-white">
+                            <h6 class="fw-semibold"><i class="fas fa-building" style="color: #A73493;"></i> Sede Principal</h6>
+                            <p class="display-6 fw-bold text-dark" id="productos-sede">0</p>
+                            <a href="/inventario-corporativo/sede-principal" class="btn btn-primary btn-sm">Ver</a>
+                        </div>
+                    </div>
+
+                    <!-- Oficinas de Servicio -->
+                    <div class="col-xl-4 col-md-6">
+                        <div class="card stats-card border-0 shadow-sm text-center p-3 bg-white">
+                            <h6 class="fw-semibold"><i class="fas fa-map-marker-alt" style="color: #28a745;"></i> Oficinas de Servicio</h6>
+                            <p class="display-6 fw-bold text-dark" id="productos-oficinas">0</p>
+                            <a href="/inventario-corporativo/oficinas-servicio" class="btn btn-primary btn-sm">Ver</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Acciones Rápidas -->
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="fw-semibold mb-3" style="color: #0098B1;"><i class="fas fa-bolt"></i> Acciones Rápidas</h6>
+                        <div class="d-flex flex-wrap gap-2">
+                            <a href="/inventario-corporativo/crear" class="btn btn-primary"><i class="fas fa-plus"></i> Nuevo Producto</a>
+                            <a href="/inventario-corporativo" class="btn btn-success"><i class="fas fa-list"></i> Ver Inventario</a>
+                            <a href="/inventario-corporativo/reportes" class="btn btn-info"><i class="fas fa-chart-bar"></i> Reportes</a>
+                            {% if session.rol in ['administrador', 'lider_inventario'] %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="background-color: #D9D9D9;">
+                <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Préstamos -->
+
+<!-- Modal: Préstamos -->
+<div class="modal fade" id="modalPrestamos" tabindex="-1" aria-labelledby="modalPrestamosLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-3">
+      <div class="modal-header" style="background-color: #A73493; color: #fff;">
+        <h5 class="modal-title fw-bold d-flex align-items-center gap-2" id="modalPrestamosLabel">
+          <i class="fas fa-exchange-alt"></i>
+          Préstamo de Material
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body" style="background-color:#F8F9FA;">
+        <p class="text-muted mb-3">Elige una acción para gestionar los préstamos.</p>
+
+        <div class="row g-3">
+          <!-- Crear Material (ahora primera columna) -->
+          <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-start">
+                  <div class="me-3 fs-3"><i class="fas fa-plus-circle" style="color:#A73493;"></i></div>
+                  <div>
+                    <h6 class="fw-semibold mb-1">Crear Material</h6>
+                    <p class="text-muted small mb-2">Registrar un material para préstamos.</p>
+                    <a href="/prestamos/elementos/crearmaterial" class="btn btn-outline-primary btn-sm">
+                      <i class="fas fa-plus-square"></i> Crear
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nuevo Préstamo (segunda columna) -->
+          <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-start">
+                  <div class="me-3 fs-3"><i class="fas fa-clipboard-list" style="color:#0098B1;"></i></div>
+                  <div>
+                    <h6 class="fw-semibold mb-1">Nuevo Préstamo</h6>
+                    <p class="text-muted small mb-2">Entrega de material a oficina/usuario.</p>
+                    <a href="/prestamos/crear" class="btn btn-primary btn-sm">
+                      <i class="fas fa-plus"></i> Nuevo Préstamo
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ver Préstamos (tercera columna) -->
+          <div class="col-md-4">
+            <div class="card h-100 border-0 shadow-sm">
+              <div class="card-body">
+                <div class="d-flex align-items-start">
+                  <div class="me-3 fs-3"><i class="fas fa-box-open" style="color:#6f42c1;"></i></div>
+                  <div>
+                    <h6 class="fw-semibold mb-1">Ver Préstamos</h6>
+                    <p class="text-muted small mb-2">Historial, estados y devoluciones.</p>
+                    <a href="/prestamos" class="btn btn-outline-primary btn-sm">
+                      <i class="fas fa-list"></i> Ver Préstamos
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div class="alert alert-light border mt-3 mb-0" role="alert">
+          <i class="fas fa-info-circle me-1"></i>
+          Consejo: al registrar un préstamo, verifica el <strong>stock disponible</strong> y la <strong>fecha de devolución prevista</strong>.
+        </div>
+      </div>
+
+      <div class="modal-footer" style="background-color:#D9D9D9;">
+        <button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+
+    </div>
+  </div>
+</div> 
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Cargar estadísticas del inventario corporativo cuando se abre el modal
+  const invModal = document.getElementById('modalInventarioCorporativo');
+  if (invModal) {
+    invModal.addEventListener('show.bs.modal', function () {
+      fetch('/api/inventario-corporativo/estadisticas')
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('total-productos').textContent = data.total_productos || 0;
+          document.getElementById('productos-sede').textContent = data.productos_sede || 0;
+          document.getElementById('productos-oficinas').textContent = data.productos_oficinas || 0;
+        })
+        .catch(error => {
+          console.error('Error cargando estadísticas:', error);
+        });
+    });
+  }
+</script>
+{% endblock %}

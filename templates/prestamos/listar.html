@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Préstamos de Material - Sistema de Gestión</title>
+</head>
+<body>
+    {% extends "base.html" %}
+
+    {% block title %}Préstamos de Material - Sistema de Gestión{% endblock %}
+
+    {% block content %}
+    <div class="container-fluid fade-in">
+        <!-- Encabezado -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="fw-bold" style="color: #A73493;">
+                    <i class="fas fa-exchange-alt"></i> Préstamos de Material
+                </h1>
+                <p class="text-muted">Control y seguimiento de préstamos de material</p>
+            </div>
+            <a href="/prestamos/crear" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Nuevo Préstamo
+            </a>
+        </div>
+
+        <!-- Tabla de préstamos -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Material</th>
+                                <th>Usuario</th>
+                                <th>Oficina</th>
+                                <th>Cantidad</th>
+                                <th>Fecha Préstamo</th>
+                                <th>Devolución Prevista</th>
+                                <th>Estado</th>
+                                <th>Evento</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prestamo in prestamos %}
+                            <tr>
+                                <td><strong>{{ prestamo.material }}</strong></td>
+                                <td>{{ prestamo.usuario_solicitante }}</td>
+                                <td>{{ prestamo.oficina }}</td>
+                                <td>{{ prestamo.cantidad }}</td>
+                                <td>{{ prestamo.fecha_prestamo.strftime('%d/%m/%Y') if prestamo.fecha_prestamo else 'N/A' }}</td>
+                                <td>{{ prestamo.fecha_devolucion_prevista.strftime('%d/%m/%Y') if prestamo.fecha_devolucion_prevista else 'N/A' }}</td>
+                                <td>
+                                    {% if prestamo.estado == 'PRESTADO' %}
+                                    <span class="badge bg-warning">Prestado</span>
+                                    {% elif prestamo.estado == 'DEVUELTO' %}
+                                    <span class="badge bg-success">Devuelto</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">{{ prestamo.estado }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ prestamo.evento or 'No especificado' }}</td>
+                                <td>
+                                    {% if prestamo.estado == 'PRESTADO' %}
+                                    <button type="button"
+                                            class="btn btn-success btn-sm"
+                                            title="Registrar devolución"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modalDevolver"
+                                            data-prestamo-id="{{ prestamo.id }}"
+                                            data-elemento="{{ prestamo.material }}"
+                                            data-cantidad="{{ prestamo.cantidad }}"
+                                            data-fecha-prestamo="{{ prestamo.fecha_prestamo.strftime('%Y-%m-%d') if prestamo.fecha_prestamo else '' }}">
+                                        <i class="fas fa-undo"></i> Devolver
+                                    </button>
+                                    {% else %}
+                                    <span class="text-muted">
+                                        Devuelto el {{ prestamo.fecha_devolucion_real.strftime('%d/%m/%Y') if prestamo.fecha_devolucion_real else 'N/A' }}
+                                    </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-4">
+                                    <i class="fas fa-exchange-alt fa-2x mb-2"></i><br>
+                                    No hay préstamos registrados
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Devolver préstamo -->
+    <div class="modal fade" id="modalDevolver" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form id="formDevolver" method="POST">
+                <div class="modal-content">
+                    <div class="modal-header bg-success text-white">
+                        <h5 class="modal-title">
+                            <i class="fas fa-undo"></i> Registrar Devolución
+                        </h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <div><strong>Elemento:</strong> <span id="devElemento"></span></div>
+                            <div><strong>Cantidad prestada:</strong> <span id="devCantidad"></span></div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Fecha de Devolución *</strong></label>
+                            <input type="date" class="form-control" id="fecha_devolucion_real" name="fecha_devolucion_real" required>
+                            <div class="form-text">No puede ser futura. Idealmente, no anterior a la fecha de préstamo.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label"><strong>Observación</strong></label>
+                            <textarea class="form-control" id="observacion_devolucion" name="observacion_devolucion" rows="3"
+                                    placeholder="Notas relevantes sobre la devolución (opcional)"></textarea>
+                        </div>
+
+                        <input type="hidden" id="prestamo_id_hidden" name="prestamo_id">
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="submit" class="btn btn-success">Confirmar Devolución</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endblock %}
+
+    {% block scripts %}
+    {{ super() }}
+    <script>
+        (function () {
+            const modalEl = document.getElementById('modalDevolver');
+            const form = document.getElementById('formDevolver');
+            const devElemento = document.getElementById('devElemento');
+            const devCantidad = document.getElementById('devCantidad');
+            const inputFecha = document.getElementById('fecha_devolucion_real');
+            const inputObs   = document.getElementById('observacion_devolucion');
+            const prestamoHidden = document.getElementById('prestamo_id_hidden');
+
+            // setea hoy como valor y max
+            function setTodayAsDefault() {
+                const today = new Date().toISOString().split('T')[0];
+                inputFecha.value = today;
+                inputFecha.max   = today;
+            }
+
+            modalEl.addEventListener('show.bs.modal', function (event) {
+                const btn = event.relatedTarget;
+                const prestamoId = btn.getAttribute('data-prestamo-id');
+                const elemento   = btn.getAttribute('data-elemento') || '';
+                const cantidad   = btn.getAttribute('data-cantidad') || '';
+                const fPrestamo  = btn.getAttribute('data-fecha-prestamo') || '';
+
+                devElemento.textContent = elemento;
+                devCantidad.textContent = cantidad;
+
+                // Fecha: por defecto hoy; como referencia, podrías usar fPrestamo para validar en el servidor
+                setTodayAsDefault();
+
+                // acción del form
+                form.action = `/prestamos/devolver/${prestamoId}`;
+                prestamoHidden.value = prestamoId;
+
+                // limpiar observación
+                inputObs.value = '';
+            });
+
+            // Validación simple en cliente: no futura, y opcionalmente no anterior a fecha de préstamo
+            form.addEventListener('submit', function(e){
+                const val = inputFecha.value;
+                if (!val) {
+                    alert('Seleccione la fecha de devolución.');
+                    e.preventDefault();
+                    return;
+                }
+                const today = new Date().toISOString().split('T')[0];
+                if (val > today) {
+                    alert('La fecha de devolución no puede ser futura.');
+                    e.preventDefault();
+                    return;
+                }
+            });
+        })();
+    </script>
+    {% endblock %}
+</body>
+</html>

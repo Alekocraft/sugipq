@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Sistema de Reportes{% endblock %}
+{% block content %}
+<h1>📊 Sistema de Reportes</h1>
+<a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary">
+            <div class="card-body text-center">
+                <h3>📦</h3>
+                <h5>Reporte de Materiales</h5>
+                <p>Inventario completo con trazabilidad</p>
+                <a href="/reportes/materiales" class="btn btn-light">Ver Reporte</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-success">
+            <div class="card-body text-center">
+                <h3>📋</h3>
+                <h5>Reporte de Solicitudes</h5>
+                <p>Historial y estado de solicitudes</p>
+                <a href="/reportes/solicitudes" class="btn btn-light">Ver Reporte</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-warning">
+            <div class="card-body text-center">
+                <h3>📈</h3>
+                <h5>Reporte de Inventario</h5>
+                <p>Valoración y estadísticas</p>
+                <a href="/reportes/inventario" class="btn btn-light">Ver Reporte</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

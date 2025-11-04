@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+{% block title %}Nuevo Préstamo{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="fw-bold">
+      <i class="fas fa-plus"></i> Nuevo Préstamo de Elemento Publicitario
+    </h1>
+    <div class="d-flex gap-2">
+      <a href="{{ url_for('prestamos.crear_elemento_publicitario_get') }}" class="btn btn-outline-primary">
+        <i class="fas fa-plus-square"></i> Crear Elemento
+      </a>
+      <a href="{{ url_for('prestamos.listar') }}" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-left"></i> Volver
+      </a>
+    </div>
+  </div>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  {% for category, message in messages %}
+  <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
+  {% endif %}
+  {% endwith %}
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-primary text-white">
+      <h5 class="mb-0"><i class="fas fa-clipboard-list"></i> Formulario de Préstamo</h5>
+    </div>
+    <div class="card-body">
+      <form id="formPrestamo" method="POST" action="{{ url_for('prestamos.crear_post') }}" novalidate>
+        <div class="row">
+          <div class="col-lg-6">
+            <!-- Usuario solicitante (desde sesión) -->
+            <div class="mb-3">
+              <label class="form-label"><strong>Usuario Solicitante *</strong></label>
+              <input type="text" class="form-control" value="{{ session.usuario_nombre }}" readonly>
+              <input type="hidden" name="usuario_id" value="{{ session.usuario_id }}">
+              <small class="text-muted">Tomado de la sesión activa</small>
+            </div>
+
+            <!-- Oficina (desde sesión) -->
+            <div class="mb-3">
+              <label class="form-label"><strong>Oficina *</strong></label>
+              <input type="text" class="form-control" value="{{ session.oficina_nombre }}" readonly>
+              <input type="hidden" name="oficina_id" value="{{ session.oficina_id }}">
+              <small class="text-muted">Tomado de la sesión activa</small>
+            </div>
+
+            <!-- Elemento Publicitario -->
+            <div class="mb-3">
+              <div class="d-flex justify-content-between align-items-center">
+                <label class="form-label mb-0"><strong>Elemento Publicitario *</strong></label>
+                <a class="small" href="{{ url_for('prestamos.crear_elemento_publicitario_get') }}">Crear nuevo</a>
+              </div>
+              <select class="form-select" id="elemento_id" name="elemento_id" required>
+                <option value="">Seleccione…</option>
+                {% for e in elementos %}
+                  <option value="{{ e.id }}"
+                          data-stock="{{ e.cantidad }}"
+                          data-valor="{{ e.valor_unitario }}"
+                          data-imagen="{{ e.ruta_imagen or '' }}"
+                          data-nombre="{{ e.nombre }}">
+                    {{ e.nombre }} — Stock: {{ e.cantidad }} — ${{ "{:,.2f}".format(e.valor_unitario) }}
+                  </option>
+                {% endfor %}
+              </select>
+              <div class="form-text">
+                <span id="stockInfo" class="text-muted">
+                  {% if not elementos or elementos|length == 0 %}
+                    No hay elementos activos. <a href="{{ url_for('prestamos.crear_elemento_publicitario_get') }}">Cree uno aquí</a>.
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+
+            <!-- Cantidad prestada -->
+            <div class="mb-3">
+              <label class="form-label"><strong>Cantidad Prestada *</strong></label>
+              <input type="number" class="form-control" id="cantidad_prestada" name="cantidad_prestada"
+                     inputmode="numeric" min="1" required placeholder="Ej: 1">
+              <div class="invalid-feedback" id="cantidadFeedback" style="display:none;">
+                La cantidad no puede exceder el stock disponible.
+              </div>
+            </div>
+
+            <!-- Fecha devolución prevista -->
+            <div class="mb-3">
+              <label class="form-label"><strong>Fecha Devolución Prevista *</strong></label>
+              <input type="date" class="form-control" id="fecha_devolucion_prevista" name="fecha_devolucion_prevista" required>
+            </div>
+
+            <!-- Evento -->
+            <div class="mb-3">
+              <label class="form-label"><strong>Evento / Actividad</strong></label>
+              <input type="text" class="form-control" name="evento" placeholder="Ej: Feria, Taller, Lanzamiento…">
+            </div>
+
+            <!-- Observaciones -->
+            <div class="mb-3">
+              <label class="form-label"><strong>Observaciones</strong></label>
+              <textarea class="form-control" name="observaciones" rows="3" placeholder="Notas adicionales…"></textarea>
+            </div>
+          </div>
+
+          <div class="col-lg-6">
+            <!-- Panel info elemento + previsualización -->
+            <div class="card bg-light mb-3">
+              <div class="card-header"><strong>Información del Elemento</strong></div>
+              <div class="card-body">
+                <div id="previewWrapper" class="text-center mb-3" style="display:none;">
+                  <img id="previewImg" src="" alt="Previsualización"
+                       class="img-fluid rounded" style="max-height:220px; object-fit:contain;">
+                </div>
+                <div id="previewInfo" class="text-muted">
+                  Seleccione un elemento para ver detalles.
+                </div>
+              </div>
+            </div>
+
+            <!-- Resumen -->
+            <div class="card bg-info text-white">
+              <div class="card-header"><strong>Resumen</strong></div>
+              <div class="card-body">
+                <div id="resumen">
+                  Complete los campos para ver el resumen del préstamo.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr class="my-4">
+        <div class="d-flex justify-content-end gap-2">
+          <a href="{{ url_for('prestamos.listar') }}" class="btn btn-secondary">Cancelar</a>
+          <button id="btnSubmit" type="submit" class="btn btn-primary" disabled>
+            <span class="me-1"><i class="fas fa-save"></i></span> Registrar Préstamo
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Fecha mínima = hoy y valor por defecto si está vacío
+  (function setMinReturnDate() {
+    const input = document.getElementById('fecha_devolucion_prevista');
+    if (!input) return;
+    const today = new Date().toISOString().split('T')[0];
+    input.min = today;
+    if (!input.value) input.value = today;
+  })();
+
+  const sel = document.getElementById('elemento_id');
+  const qty = document.getElementById('cantidad_prestada');
+  const stockInfo = document.getElementById('stockInfo');
+  const feedback = document.getElementById('cantidadFeedback');
+  const btnSubmit = document.getElementById('btnSubmit');
+  const previewWrapper = document.getElementById('previewWrapper');
+  const previewImg = document.getElementById('previewImg');
+  const previewInfo = document.getElementById('previewInfo');
+  const resumen = document.getElementById('resumen');
+  const form = document.getElementById('formPrestamo');
+
+  function numberToMoney(n) {
+    if (isNaN(n)) return '0';
+    return Number(n).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  }
+
+  function getSelectedMeta() {
+    if (!sel || !sel.value) return null;
+    const opt = sel.options[sel.selectedIndex];
+    return {
+      id: sel.value,
+      nombre: opt.getAttribute('data-nombre') || '',
+      stock: parseInt(opt.getAttribute('data-stock') || '0', 10),
+      valor: parseFloat(opt.getAttribute('data-valor') || '0'),
+      imagen: opt.getAttribute('data-imagen') || ''
+    };
+  }
+
+  function normalizeStaticPath(p) {
+    if (!p) return '';
+    let src = p;
+    if (src.startsWith('/static/')) return src;
+    if (src.startsWith('static/')) return '/' + src; // "static/... " -> "/static/..."
+    return '/static/' + src.replace(/^\/+/, '');
+  }
+
+  function updatePreview() {
+    const meta = getSelectedMeta();
+    if (!meta) {
+      previewWrapper.style.display = 'none';
+      previewInfo.innerHTML = 'Seleccione un elemento para ver detalles.';
+      stockInfo.textContent = '';
+      return;
+    }
+
+    stockInfo.textContent = `Stock disponible: ${meta.stock} unidades — Valor unitario: $${numberToMoney(meta.valor)}`;
+
+    if (meta.imagen && meta.imagen !== 'None') {
+      previewImg.src = normalizeStaticPath(meta.imagen);
+      previewWrapper.style.display = '';
+    } else {
+      previewWrapper.style.display = 'none';
+    }
+
+    updateResumen();
+  }
+
+  function updateResumen() {
+    const meta = getSelectedMeta();
+    const cantidad = parseInt(qty.value || '0', 10);
+    if (!meta || !cantidad || cantidad <= 0) {
+      resumen.innerHTML = 'Complete los campos para ver el resumen del préstamo.';
+      return;
+    }
+    const total = (meta.valor || 0) * cantidad;
+    resumen.innerHTML = `
+      <div class="table-responsive">
+        <table class="table table-sm table-bordered bg-white">
+          <tbody>
+            <tr><th>Elemento</th><td>${meta.nombre}</td></tr>
+            <tr><th>Cantidad</th><td>${cantidad} u</td></tr>
+            <tr><th>Valor unitario</th><td>$${numberToMoney(meta.valor)}</td></tr>
+            <tr><th>Valor total</th><td class="fw-bold text-primary">$${numberToMoney(total)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function validateQty() {
+    const meta = getSelectedMeta();
+    if (!meta) {
+      feedback.style.display = 'none';
+      qty.classList.remove('is-invalid');
+      btnSubmit.disabled = true;
+      return;
+    }
+    const cantidad = parseInt(qty.value || '0', 10);
+    const ok = (cantidad >= 1) && (cantidad <= meta.stock);
+    feedback.style.display = ok ? 'none' : '';
+    qty.classList.toggle('is-invalid', !ok);
+    btnSubmit.disabled = !ok || !sel.value;
+    updateResumen();
+  }
+
+  // Validación final antes de enviar (por seguridad)
+  form.addEventListener('submit', function(e){
+    const meta = getSelectedMeta();
+    const cantidad = parseInt(qty.value || '0', 10);
+    if (!meta || !(cantidad >= 1 && cantidad <= meta.stock)) {
+      e.preventDefault();
+      validateQty();
+      if (!meta) alert('Seleccione un elemento.');
+      else alert('La cantidad no puede exceder el stock disponible.');
+      return;
+    }
+    // Evitar doble submit
+    btnSubmit.disabled = true;
+    btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Guardando...';
+  });
+
+  if (sel) sel.addEventListener('change', function () {
+    updatePreview();
+    validateQty();
+  });
+
+  if (qty) qty.addEventListener('input', validateQty);
+
+  // Estado inicial
+  updatePreview();
+  validateQty();
+</script>
+{% endblock %}

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Crear Materiales{% endblock %}
+{% block content %}
+<h1>➕ Crear Materiales (hasta 10)</h1>
+<a href="/dashboard" class="btn btn-secondary">← Volver a Dashboard</a>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+<div class="alert alert-{{ 'danger' if category == 'danger' else 'success' }} alert-dismissible fade show mt-3">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+
+<form method="POST" enctype="multipart/form-data" id="materialesForm" class="mt-3">
+    <div id="materiales-container">
+        <div class="material-entry card mb-3" data-index="0">
+            <div class="card-header">
+                <h5 class="mb-0">Material 1</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <label class="form-label">Nombre del Material *</label>
+                        <input type="text" name="nombre_0" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Valor Unitario ($)*</label>
+                        <input type="number" step="0.01" name="valor_unitario_0" class="form-control" required min="0.01">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Cantidad *</label>
+                        <input type="number" name="cantidad_0" class="form-control" required min="1">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Foto *</label>
+                        <input type="file" name="imagen_0" class="form-control" accept="image/*" required onchange="previewImage(this, 0)">
+                        <img id="preview_0" class="preview-img mt-2 d-none" style="max-width: 100px; max-height: 100px; border: 1px solid #dee2e6; border-radius: 4px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" class="btn btn-outline-primary mb-3" id="addMaterialBtn">+ Agregar otro elemento</button>
+    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+        <a href="/materiales" class="btn btn-secondary me-md-2">Cancelar</a>
+        <button type="submit" class="btn btn-success">💾 Guardar Todos los Materiales</button>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let materialCount = 1;
+    const MAX_MATERIALES = 10;
+
+    function previewImage(input, index) {
+        const preview = document.getElementById('preview_' + index);
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                preview.src = e.target.result;
+                preview.classList.remove('d-none');
+            }
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    document.getElementById('addMaterialBtn').addEventListener('click', function () {
+        if (materialCount >= MAX_MATERIALES) {
+            alert('⚠️ Máximo 10 materiales permitidos.');
+            return;
+        }
+
+        const container = document.getElementById('materiales-container');
+        const newIndex = materialCount;
+        const html = `
+            <div class="material-entry card mb-3" data-index="${newIndex}">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Material ${newIndex + 1}</h5>
+                    <button type="button" class="btn btn-sm btn-danger" onclick="this.closest('.material-entry').remove(); materialCount--; updateAddButton();">🗑️ Eliminar</button>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <label class="form-label">Nombre del Material *</label>
+                            <input type="text" name="nombre_${newIndex}" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Valor Unitario ($)*</label>
+                            <input type="number" step="0.01" name="valor_unitario_${newIndex}" class="form-control" required min="0.01">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Cantidad *</label>
+                            <input type="number" name="cantidad_${newIndex}" class="form-control" required min="1">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Foto *</label>
+                            <input type="file" name="imagen_${newIndex}" class="form-control" accept="image/*" required onchange="previewImage(this, ${newIndex})">
+                            <img id="preview_${newIndex}" class="preview-img mt-2 d-none" style="max-width: 100px; max-height: 100px; border: 1px solid #dee2e6; border-radius: 4px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        container.insertAdjacentHTML('beforeend', html);
+        materialCount++;
+        updateAddButton();
+    });
+
+    function updateAddButton() {
+        const btn = document.getElementById('addMaterialBtn');
+        if (materialCount >= MAX_MATERIALES) {
+            btn.disabled = true;
+            btn.textContent = 'Límite alcanzado (10)';
+        } else {
+            btn.disabled = false;
+            btn.textContent = '+ Agregar otro elemento';
+        }
+    }
+</script>
+
+<style>
+    .material-entry {
+        border-left: 4px solid #007bff;
+        background-color: #f8f9fa;
+    }
+
+        .material-entry:nth-child(even) {
+            border-left-color: #28a745;
+        }
+
+    .preview-img {
+        display: block;
+        margin-top: 8px;
+    }
+</style>
+{% endblock %}

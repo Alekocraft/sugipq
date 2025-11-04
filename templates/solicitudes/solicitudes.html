@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Solicitudes{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1>📋 Solicitudes de Materiales</h1>
+
+    <!-- Filtros y búsqueda -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="estado" class="form-label">Filtrar por estado:</label>
+                            <select name="estado" id="estado" class="form-select">
+                                <option value="todos" {% if filtro_estado=='todos' %}selected{% endif %}>Todos los estados</option>
+                                <option value="pendiente" {% if filtro_estado=='pendiente' %}selected{% endif %}>Pendiente</option>
+                                <option value="aprobada" {% if filtro_estado=='aprobada' %}selected{% endif %}>Aprobada</option>
+                                <option value="rechazada" {% if filtro_estado=='rechazada' %}selected{% endif %}>Rechazada</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="oficina" class="form-label">Filtrar por oficina:</label>
+                            <select name="oficina" id="oficina" class="form-select">
+                                <option value="todas" {% if filtro_oficina=='todas' %}selected{% endif %}>Todas las oficinas</option>
+                                {% for oficina in oficinas_unique %}
+                                <option value="{{ oficina }}" {% if filtro_oficina==oficina %}selected{% endif %}>{{ oficina }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-12 mt-2">
+                            <button type="submit" class="btn btn-primary me-2">🔍 Filtrar</button>
+                            <a href="/solicitudes" class="btn btn-secondary">🔄 Limpiar</a>
+                            <a href="/reportes/solicitudes/exportar/excel?estado={{ filtro_estado }}&oficina={{ filtro_oficina }}&material={{ request.args.get('material', '') }}&solicitante={{ request.args.get('solicitante', '') }}"
+                               class="btn btn-success">
+                                📊 Exportar a Excel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen de estados - CON FILTROS -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📊 Resumen de Estados</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="card bg-light clickable-card" onclick="filtrarPorEstado('todos')">
+                                <div class="card-body">
+                                    <h6>Total</h6>
+                                    <h4 class="text-primary">{{ total_solicitudes }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white clickable-card" onclick="filtrarPorEstado('pendiente')">
+                                <div class="card-body">
+                                    <h6>Pendientes</h6>
+                                    <h4>{{ solicitudes_pendientes }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white clickable-card" onclick="filtrarPorEstado('aprobada')">
+                                <div class="card-body">
+                                    <h6>Aprobadas</h6>
+                                    <h4>{{ solicitudes_aprobadas }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white clickable-card" onclick="filtrarPorEstado('rechazada')">
+                                <div class="card-body">
+                                    <h6>Rechazadas</h6>
+                                    <h4>{{ solicitudes_rechazadas }}</h4>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mensajes flash -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    <!-- Tabla de solicitudes -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">📝 Lista de Solicitudes ({{ solicitudes|length }} registros)</h5>
+                    <a href="/solicitudes/crear" class="btn btn-light btn-sm">
+                        <i class="fas fa-plus"></i> Nueva Solicitud
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if solicitudes %}
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Material</th>
+                                    <th>Cantidad</th>
+                                    <th>Solicitante</th>
+                                    <th>Oficina</th>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for solicitud in solicitudes %}
+                                {% set material_nombre = solicitud.material_nombre if solicitud.material_nombre else 'Material no encontrado' %}
+                                {% set stock_actual = materiales_dict[solicitud.material_id].cantidad if materiales_dict and materiales_dict.get(solicitud.material_id) else 0 %}
+                                {% set solicitante_nombre = solicitud.usuario_solicitante if solicitud.usuario_solicitante else 'N/A' %}
+                                {% set oficina_nombre = solicitud.oficina_nombre if solicitud.oficina_nombre else 'N/A' %}
+                                {% set fecha_solicitud = solicitud.fecha_solicitud if solicitud.fecha_solicitud else 'N/A' %}
+                                {% set estado = solicitud.estado if solicitud.estado else 'pendiente' %}
+
+                                {# VARIABLES CRÍTICAS (normalizadas y robustas) #}
+                                {% set user_rol = ((session.get('rol', 'usuario') or 'usuario')|string)|lower|trim %}
+                                {% set estado_normalizado = ((estado or 'pendiente')|string)|lower|trim %}
+                                {% set esta_pendiente = estado_normalizado == 'pendiente' or estado_normalizado.startswith('pend') %}
+                                {% set tiene_permisos = user_rol in ['administrador', 'aprobador'] %}
+
+                                <tr>
+                                    <td><strong>#{{ solicitud.id }}</strong></td>
+                                    <td>
+                                        <strong>{{ material_nombre }}</strong>
+                                        <br>
+                                        <small class="text-muted">Stock: {{ stock_actual }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ solicitud.cantidad_solicitada }}</span>
+                                        {% if solicitud.cantidad_aprobada and solicitud.cantidad_aprobada > 0 %}
+                                        <br>
+                                        <small class="text-success">Aprobada: {{ solicitud.cantidad_aprobada }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ solicitante_nombre }}</td>
+                                    <td>{{ oficina_nombre }}</td>
+                                    <td>
+                                        {% if fecha_solicitud != 'N/A' %}
+                                        {{ fecha_solicitud.strftime('%d/%m/%Y %H:%M') }}
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if estado_normalizado == 'pendiente' %}
+                                        <span class="badge bg-warning">⏳ Pendiente</span>
+                                        {% elif estado_normalizado == 'aprobada' %}
+                                        <span class="badge bg-success">✅ Aprobada</span>
+                                        {% elif estado_normalizado == 'rechazada' %}
+                                        <span class="badge bg-danger">❌ Rechazada</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ estado }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="btn-group" role="group">
+                                            <!-- Ver (siempre visible) -->
+                                            
+                                            <button type="button"
+                                                    class="btn btn-info btn-sm"
+                                                    onclick="verDetallesSolicitud(
+                                                    {{ solicitud.id }},
+                                                    '{{ material_nombre }}',
+                                                    {{ solicitud.cantidad_solicitada }},
+                                                    {{ stock_actual }},
+                                                    '{{ solicitante_nombre }}',
+                                                    '{{ oficina_nombre }}',
+                                                    '{{ fecha_solicitud.strftime('%d/%m/%Y %H:%M') if fecha_solicitud != 'N/A' else 'N/A' }}',
+                                                    '{{ estado }}',
+                                                    {{ solicitud.porcentaje_oficina }},
+                                                    {{ solicitud.valor_total_solicitado }},
+                                                    {{ solicitud.valor_oficina }},
+                                                    {{ solicitud.valor_sede }},
+                                                    '{{ solicitud.observacion | replace("'", "\\'") }}'
+                                                )"
+                                                    title="Ver detalles completos">
+                                                     👁️ Ver
+                                            </button>
+
+
+
+                                            <!-- BOTONES DE APROBACIÓN: solo admin/aprobador y si está pendiente -->
+                                            {% if tiene_permisos and esta_pendiente %}
+                                            <form action="/solicitudes/aprobar/{{ solicitud.id }}" method="POST" style="display: inline;">
+                                                <button type="submit" class="btn btn-success btn-sm"
+                                                        onclick="return confirm('¿Estás seguro de aprobar completamente esta solicitud?')"
+                                                        title="Aprobar solicitud completamente">
+                                                    ✅ Aprobar
+                                                </button>
+                                            </form>
+
+                                            <button type="button"
+                                                    class="btn btn-warning btn-sm"
+                                                    onclick="mostrarModalAprobacionParcial({{ solicitud.id }}, {{ solicitud.cantidad_solicitada }}, '{{ material_nombre }}', '{{ solicitante_nombre }}')"
+                                                    title="Aprobación parcial">
+                                                ⚠️ Parcial
+                                            </button>
+
+                                            <button type="button"
+                                                    class="btn btn-danger btn-sm"
+                                                    onclick="mostrarModalRechazar({{ solicitud.id }}, '{{ material_nombre }}', '{{ solicitante_nombre }}')"
+                                                    title="Rechazar solicitud">
+                                                ❌ Rechazar
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info text-center mt-3">
+                        <h5>📭 No hay solicitudes</h5>
+                        <p>No se encontraron solicitudes con los filtros aplicados.</p>
+                        <a href="/solicitudes/crear" class="btn btn-primary">➕ Crear Primera Solicitud</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para detalles de solicitud -->
+<div class="modal fade" id="modalDetalles" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">📋 Detalles Completos de la Solicitud</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="detallesSolicitud">
+                <!-- Los detalles se cargarán aquí dinámicamente -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para aprobación parcial -->
+<div class="modal fade" id="modalAprobacionParcial" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title">⚠️ Aprobación Parcial</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong id="infoMaterialParcial"></strong><br>
+                    <strong>Solicitante:</strong> <span id="infoSolicitanteParcial"></span><br>
+                    <strong>Cantidad solicitada:</strong> <span id="infoCantidadParcial"></span>
+                </div>
+                <form id="formAprobacionParcial" method="POST">
+                    <input type="hidden" id="solicitud_id_parcial" name="solicitud_id">
+                    <div class="mb-3">
+                        <label for="cantidad_aprobada" class="form-label">Cantidad a aprobar:</label>
+                        <input type="number" class="form-control" id="cantidad_aprobada" name="cantidad_aprobada" min="1" required>
+                        <small class="form-text text-muted" id="maximo_cantidad"></small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" onclick="confirmarAprobacionParcial()">✅ Confirmar Aprobación Parcial</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para rechazar solicitud -->
+<div class="modal fade" id="modalRechazar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">❌ Rechazar Solicitud</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <strong id="infoMaterialRechazar"></strong><br>
+                    <strong>Solicitante:</strong> <span id="infoSolicitanteRechazar"></span>
+                </div>
+                <form id="formRechazar" method="POST">
+                    <input type="hidden" id="solicitud_id_rechazar" name="solicitud_id">
+                    <div class="mb-3">
+                        <label for="observacion" class="form-label">Motivo del rechazo:</label>
+                        <textarea class="form-control" id="observacion" name="observacion" rows="4" placeholder="Ingrese el motivo del rechazo..." required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="confirmarRechazo()">❌ Confirmar Rechazo</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .table th {
+        white-space: nowrap;
+    }
+
+    .btn-group .btn {
+        margin: 1px;
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    .clickable-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+        .clickable-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filtrarPorEstado(estado) {
+        const url = new URL(window.location.href);
+        if (estado && estado !== 'todos') url.searchParams.set('estado', estado);
+        else url.searchParams.delete('estado');
+        window.location.href = url.toString();
+    }
+
+    function verDetallesSolicitud(solicitudId, materialNombre, cantidadSolicitada, stockActual, solicitanteNombre, oficinaNombre, fechaSolicitud, estado, porcentajeOficina, valorTotalSolicitado, valorOficina, valorSede, observacion) {
+        const detallesHTML = `
+        <div class="row">
+            <div class="col-md-6">
+                <h6>Información Básica</h6>
+                <p><strong>ID:</strong> #${solicitudId}</p>
+                <p><strong>Estado:</strong> <span class="badge ${estado.toLowerCase() === 'pendiente' ? 'bg-warning' : estado.toLowerCase() === 'aprobada' ? 'bg-success' : 'bg-danger'}">${estado}</span></p>
+                <p><strong>Fecha de Solicitud:</strong> ${fechaSolicitud}</p>
+                <p><strong>Observación:</strong> ${observacion || 'Sin observación'}</p>
+            </div>
+            <div class="col-md-6">
+                <h6>Detalles del Material</h6>
+                <p><strong>Material:</strong> ${materialNombre}</p>
+                <p><strong>Cantidad Solicitada:</strong> ${cantidadSolicitada} unidades</p>
+                <p><strong>Stock Disponible:</strong> ${stockActual} unidades</p>
+                <p><strong>Porcentaje Oficina:</strong> ${porcentajeOficina}%</p>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <h6>Información del Solicitante</h6>
+                <p><strong>Nombre:</strong> ${solicitanteNombre}</p>
+                <p><strong>Oficina:</strong> ${oficinaNombre}</p>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-12">
+                <h6>📊 Valores Financieros</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Concepto</th>
+                                <th>Valor</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Valor Total Solicitado</strong></td>
+                                <td class="text-primary fw-bold">$${valorTotalSolicitado.toLocaleString()}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Valor a Cargo de la Oficina (${porcentajeOficina}%)</strong></td>
+                                <td class="text-success">$${valorOficina.toLocaleString()}</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Valor a Cargo de Sede Principal</strong></td>
+                                <td class="text-info">$${valorSede.toLocaleString()}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>`;
+
+        const detallesElement = document.getElementById('detallesSolicitud');
+        if (detallesElement) {
+            detallesElement.innerHTML = detallesHTML;
+            new bootstrap.Modal(document.getElementById('modalDetalles')).show();
+        }
+    }
+
+    function mostrarModalAprobacionParcial(solicitudId, cantidadSolicitada, materialNombre, solicitanteNombre) {
+        document.getElementById('solicitud_id_parcial').value = solicitudId;
+        document.getElementById('infoMaterialParcial').textContent = materialNombre;
+        document.getElementById('infoSolicitanteParcial').textContent = solicitanteNombre;
+        document.getElementById('infoCantidadParcial').textContent = cantidadSolicitada;
+
+        const inputCantidad = document.getElementById('cantidad_aprobada');
+        const maximoTexto = document.getElementById('maximo_cantidad');
+
+        inputCantidad.value = '';
+        inputCantidad.max = cantidadSolicitada;
+        inputCantidad.placeholder = `Máximo: ${cantidadSolicitada}`;
+        maximoTexto.textContent = `Cantidad máxima permitida: ${cantidadSolicitada} unidades`;
+        document.getElementById('formAprobacionParcial').action = `/solicitudes/aprobar_parcial/${solicitudId}`;
+
+        new bootstrap.Modal(document.getElementById('modalAprobacionParcial')).show();
+    }
+
+    function confirmarAprobacionParcial() {
+        const cantidad = parseInt(document.getElementById('cantidad_aprobada').value);
+        const cantidadMaxima = parseInt(document.getElementById('cantidad_aprobada').max);
+        if (!cantidad || cantidad < 1) { alert('Por favor ingrese una cantidad válida (mínimo 1)'); return; }
+        if (cantidad > cantidadMaxima) { alert(`La cantidad no puede ser mayor a ${cantidadMaxima} (cantidad solicitada)`); return; }
+        document.getElementById('formAprobacionParcial').submit();
+    }
+
+    function mostrarModalRechazar(solicitudId, materialNombre, solicitanteNombre) {
+        document.getElementById('solicitud_id_rechazar').value = solicitudId;
+        document.getElementById('infoMaterialRechazar').textContent = materialNombre;
+        document.getElementById('infoSolicitanteRechazar').textContent = solicitanteNombre;
+        document.getElementById('observacion').value = '';
+        document.getElementById('formRechazar').action = `/solicitudes/rechazar/${solicitudId}`;
+        new bootstrap.Modal(document.getElementById('modalRechazar')).show();
+    }
+
+    function confirmarRechazo() {
+        const motivo = document.getElementById('observacion').value.trim();
+        if (!motivo) { alert('Por favor ingrese un motivo para el rechazo'); return; }
+        document.getElementById('formRechazar').submit();
+    }
+</script>
+{% endblock %}

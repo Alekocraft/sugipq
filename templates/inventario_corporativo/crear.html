@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Crear Producto - Inventario Corporativo{% endblock %}
+{% block content %}
+
+<div class="container-fluid fade-in">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="card-title mb-0">
+                        <i class="fas fa-plus"></i> Nuevo Producto Corporativo
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-md-6">
+                                
+                                <div class="mb-3">
+                                    <label for="nombre" class="form-label">Nombre del Producto *</label>
+                                    <input type="text" class="form-control" id="nombre" name="nombre" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="categoria_id" class="form-label">Categoría *</label>
+                                    <select id="categoria_id" name="categoria_id" class="form-select" required>
+                                        <option value="" disabled selected>Seleccione una categoría</option>
+                                        {% for c in categorias %}
+                                        <option value="{{ c.id }}">{{ c.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="proveedor_id" class="form-label">Proveedor *</label>
+                                    <select id="proveedor_id" name="proveedor_id" class="form-select" required>
+                                        <option value="" disabled selected>Seleccione un proveedor</option>
+                                        {% for p in proveedores %}
+                                        <option value="{{ p.id }}">{{ p.nombre }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="valor_unitario" class="form-label">Valor Unitario *</label>
+                                    <input type="number" class="form-control" id="valor_unitario" name="valor_unitario" step="0.01" min="0" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="cantidad" class="form-label">Cantidad Inicial *</label>
+                                    <input type="number" class="form-control" id="cantidad" name="cantidad" min="0" required>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="cantidad_minima" class="form-label">Cantidad Mínima</label>
+                                    <input type="number" class="form-control" id="cantidad_minima" name="cantidad_minima" min="1" value="5">
+                                </div>
+                                <div class="mb-3">
+                                    <label for="ubicacion" class="form-label">Ubicación</label>
+                                    <input type="text" class="form-control" id="ubicacion" name="ubicacion">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="descripcion" class="form-label">Descripción</label>
+                            <textarea class="form-control" id="descripcion" name="descripcion" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="imagen" class="form-label">Imagen del Producto</label>
+                            <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
+                        </div>
+
+                        <!-- Checkbox es_asignable: marcado y oculto + hidden redundante -->
+                        <div class="mb-3 form-check d-none">
+                            <input type="checkbox" class="form-check-input" id="es_asignable" name="es_asignable" checked>
+                            <label class="form-check-label" for="es_asignable">Producto asignable a usuarios</label>
+                        </div>
+                        <input type="hidden" name="es_asignable" value="on">
+
+                        <div class="d-flex justify-content-between">
+                            <a href="/dashboard" class="btn btn-secondary">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Guardar Producto
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

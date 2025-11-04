@@ -1,0 +1,229 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Historial de Solicitudes - {{ material.nombre }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Botón de volver -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <a href="/reportes/materiales" class="btn btn-secondary">
+                ← Volver al Reporte de Materiales
+            </a>
+        </div>
+    </div>
+
+    <h1>📋 Historial de Solicitudes</h1>
+
+    <!-- Información del material -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📦 Información del Material</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-3">
+                            <strong>Material:</strong>
+                            <h4>{{ material.nombre if material.nombre else 'N/A' }}</h4>
+                        </div>
+                        <div class="col-md-2">
+                            <strong>Categoría:</strong>
+                            <p class="fs-5">
+                                <span class="badge bg-secondary">{{ material.categoria if material.categoria else 'Sin categoría' }}</span>
+                            </p>
+                        </div>
+                        <div class="col-md-2">
+                            <strong>Stock Actual:</strong>
+                            <p class="fs-5">
+                                <span class="badge bg-primary">{{ material.cantidad if material.cantidad else 0 }}</span>
+                            </p>
+                        </div>
+                        <div class="col-md-2">
+                            <strong>Stock Mínimo:</strong>
+                            <p class="fs-5">
+                                <span class="badge bg-info">{{ material.stock_minimo if material.stock_minimo else 0 }}</span>
+                            </p>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>Estado:</strong>
+                            <p class="fs-5">
+                                {% set stock_actual = material.cantidad if material.cantidad else 0 %}
+                                {% set stock_minimo = material.stock_minimo if material.stock_minimo else 0 %}
+
+                                {% if stock_actual <= 0 %}
+                                <span class="badge bg-danger">❌ Agotado</span>
+                                {% elif stock_actual <= stock_minimo %}
+                                <span class="badge bg-warning">⚠️ Bajo Stock</span>
+                                {% else %}
+                                <span class="badge bg-success">✅ Disponible</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    {% if material.descripcion %}
+                    <div class="row mt-2">
+                        <div class="col-md-12">
+                            <strong>Descripción:</strong>
+                            <p class="text-muted">{{ material.descripcion }}</p>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen de solicitudes -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">📊 Resumen de Solicitudes</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h6>Total de Solicitudes</h6>
+                                    <h4 class="text-primary">{{ total_solicitudes }}</h4>
+                                    <small class="text-muted">Todas las solicitudes</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white">
+                                <div class="card-body">
+                                    <h6>Pendientes</h6>
+                                    <h4>{{ solicitudes_pendientes }}</h4>
+                                    <small>Esperando aprobación</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white">
+                                <div class="card-body">
+                                    <h6>Aprobadas</h6>
+                                    <h4>{{ solicitudes_aprobadas }}</h4>
+                                    <small>Solicitudes aprobadas</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white">
+                                <div class="card-body">
+                                    <h6>Rechazadas</h6>
+                                    <h4>{{ solicitudes_rechazadas }}</h4>
+                                    <small>Solicitudes rechazadas</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de historial de solicitudes -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        📝 Historial de Solicitudes
+                        <span class="badge bg-light text-dark">{{ solicitudes|length }} registros</span>
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID Solicitud</th>
+                                    <th>Solicitante</th>
+                                    <th>Oficina</th>
+                                    <th>Cantidad Solicitada</th>
+                                    <th>Cantidad Aprobada</th>
+                                    <th>Fecha Solicitud</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for solicitud in solicitudes %}
+                                {% set estado = solicitud.estado if solicitud.estado else 'pendiente' %}
+                                {% set estado_normalizado = estado.lower() %}
+
+                                <tr>
+                                    <td><strong>#{{ solicitud.id }}</strong></td>
+                                    <td>{{ solicitud.usuario_solicitante if solicitud.usuario_solicitante else 'N/A' }}</td>
+                                    <td>{{ solicitud.oficina_nombre if solicitud.oficina_nombre else 'N/A' }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ solicitud.cantidad_solicitada }}</span>
+                                    </td>
+                                    <td>
+                                        {% if solicitud.cantidad_aprobada and solicitud.cantidad_aprobada > 0 %}
+                                        <span class="badge bg-success">{{ solicitud.cantidad_aprobada }}</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">0</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if solicitud.fecha_solicitud %}
+                                        {{ solicitud.fecha_solicitud.strftime('%d/%m/%Y %H:%M') }}
+                                        {% else %}
+                                        <span class="text-muted">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if estado_normalizado == 'pendiente' %}
+                                        <span class="badge bg-warning">⏳ Pendiente</span>
+                                        {% elif estado_normalizado == 'aprobada' %}
+                                        <span class="badge bg-success">✅ Aprobada</span>
+                                        {% elif estado_normalizado == 'rechazada' %}
+                                        <span class="badge bg-danger">❌ Rechazada</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ estado }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="/solicitudes/{{ solicitud.id }}"
+                                           class="btn btn-sm btn-outline-primary"
+                                           title="Ver detalles de la solicitud">
+                                            👁️ Ver
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if not solicitudes %}
+                    <div class="alert alert-info text-center mt-3">
+                        <h5>📭 No hay solicitudes</h5>
+                        <p>No se encontraron solicitudes para este material.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .table th {
+        white-space: nowrap;
+    }
+
+    .badge {
+        font-size: 0.8em;
+    }
+
+    .card-body h4 {
+        margin-bottom: 0;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Oficinas{% endblock %}
+{% block content %}
+<h1>🏢 Gestión de Oficinas</h1>
+<div class="d-flex justify-content-between mb-3">
+    <a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+</div>
+<div class="card">
+    <div class="card-body">
+        <h5>Lista de Oficinas ({{ oficinas|length }} encontradas)</h5>
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Director</th>
+                        <th>Email</th>
+                        <th>Ubicación</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if oficinas %}
+                    {% for ofi in oficinas %}
+                    <tr>
+                        <td><strong>{{ ofi.id }}</strong></td>
+                        <td>{{ ofi.nombre }}</td>
+                        <td>{{ ofi.director }}</td>
+                        <td>
+                            {% if ofi.email %}
+                            <a href="mailto:{{ ofi.email }}" class="text-decoration-none">
+                                📧 {{ ofi.email }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">No especificado</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ofi.ubicacion }}</td>
+                        <td>
+                            {% if ofi.es_principal %}
+                            <span class="badge bg-primary">Sede Principal</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Oficina Normal</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-success">Activa</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center">No se encontraron oficinas</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

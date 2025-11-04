@@ -1,0 +1,317 @@
+/* static/css/inventario_corporativo.css - Versión Mejorada */
+
+/* Variables de colores corporativos */
+:root {
+    --morado-primario: #A73493;
+    --azul-corporativo: #0098B1;
+    --gris-claro: #D9D9D9;
+    --gris-bordes: #dee2e6;
+    --gris-fondo: #f8f9fa;
+    --texto-oscuro: #212529;
+    --blanco: #ffffff;
+    --success: #28a745;
+    --warning: #ffc107;
+    --danger: #dc3545;
+    --info: #17a2b8;
+}
+
+/* ===== ESTILOS GENERALES ===== */
+.inv-container {
+    background-color: var(--gris-fondo);
+    min-height: 100vh;
+}
+
+.inv-card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    background: var(--blanco);
+}
+
+    .inv-card:hover {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        transform: translateY(-2px);
+    }
+
+/* ===== HEADER Y TARJETAS ===== */
+.inv-header {
+    background: linear-gradient(135deg, var(--morado-primario) 0%, var(--azul-corporativo) 100%);
+    color: var(--blanco);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.inv-stats-card {
+    background: var(--blanco);
+    border-left: 4px solid;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+    .inv-stats-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+.stats-primary {
+    border-left-color: var(--morado-primario);
+}
+
+.stats-success {
+    border-left-color: var(--azul-corporativo);
+}
+
+.stats-warning {
+    border-left-color: var(--warning);
+}
+
+.stats-info {
+    border-left-color: var(--info);
+}
+
+/* ===== BOTONES CORPORATIVOS ===== */
+.btn-inv-primary {
+    background: var(--morado-primario);
+    border-color: var(--morado-primario);
+    color: var(--blanco);
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+    .btn-inv-primary:hover {
+        background: #902d82;
+        border-color: #902d82;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(167, 52, 147, 0.3);
+    }
+
+.btn-inv-success {
+    background: var(--azul-corporativo);
+    border-color: var(--azul-corporativo);
+    color: var(--blanco);
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+    .btn-inv-success:hover {
+        background: #007e93;
+        border-color: #007e93;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 152, 177, 0.3);
+    }
+
+.btn-inv-outline {
+    border: 2px solid var(--azul-corporativo);
+    color: var(--azul-corporativo);
+    background: transparent;
+    border-radius: 8px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+}
+
+    .btn-inv-outline:hover {
+        background: var(--azul-corporativo);
+        color: var(--blanco);
+        transform: translateY(-1px);
+    }
+
+/* ===== TABLA MEJORADA ===== */
+.inv-table {
+    background: var(--blanco);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+    .inv-table thead {
+        background: linear-gradient(135deg, var(--morado-primario) 0%, var(--azul-corporativo) 100%);
+    }
+
+        .inv-table thead th {
+            color: var(--blanco);
+            border: none;
+            padding: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.875rem;
+            letter-spacing: 0.5px;
+        }
+
+    .inv-table tbody tr {
+        transition: all 0.3s ease;
+        border-bottom: 1px solid var(--gris-bordes);
+    }
+
+        .inv-table tbody tr:hover {
+            background-color: rgba(0, 152, 177, 0.05);
+            transform: scale(1.01);
+        }
+
+    .inv-table tbody td {
+        padding: 1rem;
+        vertical-align: middle;
+        border: none;
+    }
+
+/* ===== BADGES Y ESTADOS ===== */
+.badge-inv {
+    border-radius: 6px;
+    font-weight: 500;
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+}
+
+.badge-morado {
+    background: var(--morado-primario);
+    color: var(--blanco);
+}
+
+.badge-azul {
+    background: var(--azul-corporativo);
+    color: var(--blanco);
+}
+
+.badge-gris {
+    background: var(--gris-claro);
+    color: var(--texto-oscuro);
+}
+
+.stock-bajo {
+    background: linear-gradient(135deg, var(--warning), #ff8c00);
+    color: var(--blanco);
+}
+
+.stock-critico {
+    background: linear-gradient(135deg, var(--danger), #c82333);
+    color: var(--blanco);
+}
+
+.stock-normal {
+    background: linear-gradient(135deg, var(--success), #20c997);
+    color: var(--blanco);
+}
+
+/* ===== FILTROS Y BÚSQUEDA ===== */
+.inv-filters {
+    background: var(--blanco);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.search-box-inv .input-group-text {
+    background: var(--azul-corporativo);
+    border-color: var(--azul-corporativo);
+    color: var(--blanco);
+}
+
+.search-box-inv .form-control {
+    border-color: var(--azul-corporativo);
+}
+
+    .search-box-inv .form-control:focus {
+        box-shadow: 0 0 0 0.2rem rgba(0, 152, 177, 0.25);
+        border-color: var(--azul-corporativo);
+    }
+
+/* ===== IMÁGENES DE PRODUCTOS ===== */
+.producto-img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 2px solid var(--gris-bordes);
+    transition: all 0.3s ease;
+}
+
+    .producto-img:hover {
+        transform: scale(1.1);
+        border-color: var(--azul-corporativo);
+    }
+
+/* ===== BOTONES DE ACCIÓN ===== */
+.action-buttons .btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 2px;
+    transition: all 0.3s ease;
+}
+
+    .action-buttons .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+/* ===== PAGINACIÓN ===== */
+.pagination-inv .page-link {
+    color: var(--azul-corporativo);
+    border-color: var(--gris-bordes);
+}
+
+.pagination-inv .page-item.active .page-link {
+    background: var(--azul-corporativo);
+    border-color: var(--azul-corporativo);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+    .inv-header {
+        padding: 1.5rem;
+    }
+
+    .inv-table thead th {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.8rem;
+    }
+
+    .inv-table tbody td {
+        padding: 0.75rem 0.5rem;
+    }
+
+    .producto-img {
+        width: 50px;
+        height: 50px;
+    }
+}
+
+/* ===== ANIMACIONES ===== */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+/* ===== LOADING STATES ===== */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}

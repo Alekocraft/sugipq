@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{8827c70e-7ed8-4b1b-b553-51c718d1b1b5}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>app.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="requirements.txt" />
+    <Content Include="static\css\base.css" />
+    <Content Include="static\css\custom.css" />
+    <Content Include="static\css\dashboard.css" />
+    <Content Include="static\css\inventario_corporativo.css" />
+    <Content Include="static\css\login.css" />
+    <Content Include="templates\prestamos\elemento_crear.html" />
+    <Content Include="templates\auth\listar.html" />
+    <Content Include="templates\auth\login.html" />
+    <Content Include="templates\base.html" />
+    <Content Include="templates\dashboard.html" />
+    <Content Include="templates\error\404.html" />
+    <Content Include="templates\error\500.html" />
+    <Content Include="templates\inventario_corporativo\asignar.html" />
+    <Content Include="templates\inventario_corporativo\detalle.html" />
+    <Content Include="templates\inventario_corporativo\editar.html" />
+    <Content Include="templates\inventario_corporativo\listar_con_filtros.html" />
+    <Content Include="templates\inventario_corporativo\reportes.html" />
+    <Content Include="templates\materials\crear.html" />
+    <Content Include="templates\materials\listar.html" />
+    <Content Include="templates\oficinas\detalle.html" />
+    <Content Include="templates\oficinas\listar.html" />
+    <Content Include="templates\reportes\index.html" />
+    <Content Include="templates\reportes\inventario.html" />
+    <Content Include="templates\reportes\materiales.html" />
+    <Content Include="templates\reportes\material_detalle.html" />
+    <Content Include="templates\reportes\solicitudes.html" />
+    <Content Include="templates\solicitudes\solicitudes.html" />
+    <Content Include="templates\solicitudes\crear.html" />
+    <Content Include="templates\solicitudes\listar.html" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="app.py" />
+    <Compile Include="database.py" />
+    <Compile Include="models\generar_hash.py" />
+    <Compile Include="models\materiales_model.py" />
+    <Compile Include="models\oficinas_model.py" />
+    <Compile Include="routes_inventario_corporativo.py" />
+    <Compile Include="models\solicitudes_model.py" />
+    <Compile Include="models\usuarios_model.py" />
+    <Compile Include="models\verificar_imagenes.py" />
+    <Compile Include="models\verificar_materiales.py" />
+    <Compile Include="models\__init__.py" />
+    <Compile Include="routes_prestamos.py" />
+    <Compile Include="templates\materials\__init__.py" />
+    <Compile Include="templates\reportes\__init__.py" />
+    <Compile Include="templates\solicitudes\__init__.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="models\" />
+    <Folder Include="static\css\" />
+    <Folder Include="static\images\" />
+    <Folder Include="static\js\" />
+    <Folder Include="templates\" />
+    <Folder Include="static\" />
+    <Folder Include="templates\inventario_corporativo\" />
+    <Folder Include="templates\materials\" />
+    <Folder Include="templates\auth\" />
+    <Folder Include="templates\aprobadores\" />
+    <Folder Include="templates\error\" />
+    <Folder Include="templates\oficinas\" />
+    <Folder Include="templates\prestamos\" />
+    <Folder Include="templates\reportes\" />
+    <Folder Include="templates\solicitudes\" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>

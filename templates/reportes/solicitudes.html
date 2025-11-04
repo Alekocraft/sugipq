@@ -1,0 +1,279 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Reporte de Solicitudes{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1>📊 Reporte de Solicitudes</h1>
+    <!-- Banner informativo -->
+    <div class="alert alert-info">
+        <strong>📊 Vista filtrada:</strong>
+        {% if session.rol in ['administrador', 'lider_inventario'] %}
+        Mostrando datos de TODAS las oficinas (acceso total)
+        {% else %}
+        Mostrando datos únicamente de su oficina: <strong>{{ session.oficina_nombre }}</strong>
+        {% endif %}
+    </div>
+
+    <!-- Filtros y búsqueda -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <form method="GET" class="row g-3">
+                        <div class="col-md-3">
+                            <label for="estado" class="form-label">Filtrar por estado:</label>
+                            <select name="estado" id="estado" class="form-select">
+                                <option value="todos" {% if filtro_estado=='todos' %}selected{% endif %}>Todos los estados</option>
+                                <option value="pendiente" {% if filtro_estado=='pendiente' %}selected{% endif %}>Pendiente</option>
+                                <option value="aprobada" {% if filtro_estado=='aprobada' %}selected{% endif %}>Aprobada</option>
+                                <option value="rechazada" {% if filtro_estado=='rechazada' %}selected{% endif %}>Rechazada</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="oficina" class="form-label">Filtrar por oficina:</label>
+                            <select name="oficina" id="oficina" class="form-select">
+                                <option value="todas" {% if filtro_oficina=='todas' %}selected{% endif %}>Todas las oficinas</option>
+                                {% for oficina in oficinas_unique %}
+                                <option value="{{ oficina }}" {% if filtro_oficina==oficina %}selected{% endif %}>{{ oficina }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label for="material" class="form-label">Buscar por material:</label>
+                            <input type="text" name="material" id="material" class="form-control"
+                                   value="{{ request.args.get('material', '') }}"
+                                   placeholder="Nombre del material">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="solicitante" class="form-label">Buscar por solicitante:</label>
+                            <input type="text" name="solicitante" id="solicitante" class="form-control"
+                                   value="{{ request.args.get('solicitante', '') }}"
+                                   placeholder="Nombre del solicitante">
+                        </div>
+                        <div class="col-md-12 mt-2">
+                            <button type="submit" class="btn btn-primary me-2">🔍 Aplicar Filtros</button>
+                            <a href="/reportes/solicitudes" class="btn btn-secondary">🔄 Limpiar Filtros</a>
+                            <a href="/reportes/solicitudes/exportar/excel?estado={{ filtro_estado }}&oficina={{ filtro_oficina }}&material={{ request.args.get('material', '') }}&solicitante={{ request.args.get('solicitante', '') }}"
+                               class="btn btn-success">
+                                📊 Exportar a Excel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumen de estados CON FILTROS APLICADOS -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        📊 Resumen de Estados
+                        {% if filtro_estado != 'todos' or filtro_oficina != 'todas' or request.args.get('material') or request.args.get('solicitante') %}
+                        <small class="text-warning">(Filtros aplicados)</small>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="row text-center">
+                        <div class="col-md-3">
+                            <div class="card bg-light clickable-card" onclick="aplicarFiltroEstado('todos')">
+                                <div class="card-body">
+                                    <h6>Total Filtrado</h6>
+                                    <h4 class="text-primary">{{ total_solicitudes }}</h4>
+                                    <small class="text-muted">Solicitudes que coinciden</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-warning text-white clickable-card" onclick="aplicarFiltroEstado('pendiente')">
+                                <div class="card-body">
+                                    <h6>Pendientes</h6>
+                                    <h4>{{ solicitudes_pendientes }}</h4>
+                                    <small>{% if filtro_estado == 'pendiente' %}✅ Filtro activo{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-success text-white clickable-card" onclick="aplicarFiltroEstado('aprobada')">
+                                <div class="card-body">
+                                    <h6>Aprobadas</h6>
+                                    <h4>{{ solicitudes_aprobadas }}</h4>
+                                    <small>{% if filtro_estado == 'aprobada' %}✅ Filtro activo{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card bg-danger text-white clickable-card" onclick="aplicarFiltroEstado('rechazada')">
+                                <div class="card-body">
+                                    <h6>Rechazadas</h6>
+                                    <h4>{{ solicitudes_rechazadas }}</h4>
+                                    <small>{% if filtro_estado == 'rechazada' %}✅ Filtro activo{% endif %}</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de solicitudes FILTRADAS -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        📝 Lista de Solicitudes
+                        <span class="badge bg-light text-dark">{{ solicitudes|length }} registros</span>
+                        {% if filtro_estado != 'todos' or filtro_oficina != 'todas' %}
+                        <small class="text-warning">(Filtrado)</small>
+                        {% endif %}
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Material</th>
+                                    <th>Cantidad</th>
+                                    <th>Solicitante</th>
+                                    <th>Oficina</th>
+                                    <th>Fecha</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for solicitud in solicitudes %}
+                                {% set material_nombre = solicitud.material_nombre if solicitud.material_nombre else 'Material no encontrado' %}
+                                {% set stock_actual = materiales_dict[solicitud.material_id].cantidad if materiales_dict and materiales_dict.get(solicitud.material_id) else 0 %}
+                                {% set solicitante_nombre = solicitud.usuario_solicitante if solicitud.usuario_solicitante else 'N/A' %}
+                                {% set oficina_nombre = solicitud.oficina_nombre if solicitud.oficina_nombre else 'N/A' %}
+                                {% set fecha_solicitud = solicitud.fecha_solicitud if solicitud.fecha_solicitud else 'N/A' %}
+                                {% set estado = solicitud.estado if solicitud.estado else 'pendiente' %}
+
+                                {% set estado_normalizado = estado.lower() %}
+
+                                <tr>
+                                    <td><strong>#{{ solicitud.id }}</strong></td>
+                                    <td>
+                                        <strong>{{ material_nombre }}</strong>
+                                        <br>
+                                        <small class="text-muted">Stock: {{ stock_actual }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ solicitud.cantidad_solicitada }}</span>
+                                        {% if solicitud.cantidad_aprobada and solicitud.cantidad_aprobada > 0 %}
+                                        <br>
+                                        <small class="text-success">Aprobada: {{ solicitud.cantidad_aprobada }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ solicitante_nombre }}</td>
+                                    <td>{{ oficina_nombre }}</td>
+                                    <td>
+                                        {% if fecha_solicitud != 'N/A' %}
+                                        {{ fecha_solicitud.strftime('%d/%m/%Y %H:%M') }}
+                                        {% else %}
+                                        N/A
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if estado_normalizado == 'pendiente' %}
+                                        <span class="badge bg-warning">⏳ Pendiente</span>
+                                        {% elif estado_normalizado == 'aprobada' %}
+                                        <span class="badge bg-success">✅ Aprobada</span>
+                                        {% elif estado_normalizado == 'rechazada' %}
+                                        <span class="badge bg-danger">❌ Rechazada</span>
+                                        {% else %}
+                                        <span class="badge bg-secondary">{{ estado }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if not solicitudes %}
+                    <div class="alert alert-info text-center mt-3">
+                        <h5>📭 No hay solicitudes</h5>
+                        <p>No se encontraron solicitudes con los filtros aplicados.</p>
+                        <a href="/reportes/solicitudes" class="btn btn-primary">🔄 Mostrar todas</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .table th {
+        white-space: nowrap;
+    }
+
+    .clickable-card {
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+        .clickable-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+    .text-muted small {
+        font-size: 0.75em;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Función para aplicar filtro de estado desde los cards
+    function aplicarFiltroEstado(estado) {
+        const url = new URL(window.location.href);
+
+        // Actualizar el parámetro de estado
+        if (estado && estado !== 'todos') {
+            url.searchParams.set('estado', estado);
+        } else {
+            url.searchParams.delete('estado');
+        }
+
+        // Mantener otros filtros existentes
+        const oficina = '{{ filtro_oficina }}';
+        const material = '{{ request.args.get("material", "") }}';
+        const solicitante = '{{ request.args.get("solicitante", "") }}';
+
+        if (oficina && oficina !== 'todas') url.searchParams.set('oficina', oficina);
+        if (material) url.searchParams.set('material', material);
+        if (solicitante) url.searchParams.set('solicitante', solicitante);
+
+        window.location.href = url.toString();
+    }
+
+    // Enviar formulario automáticamente al cambiar selects
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectOficina = document.getElementById('oficina');
+        const selectEstado = document.getElementById('estado');
+
+        if (selectOficina) {
+            selectOficina.addEventListener('change', function() {
+                document.querySelector('form').submit();
+            });
+        }
+
+        if (selectEstado) {
+            selectEstado.addEventListener('change', function() {
+                document.querySelector('form').submit();
+            });
+        }
+    });
+</script>
+{% endblock %}

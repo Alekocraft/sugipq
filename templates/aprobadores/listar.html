@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Gestión de Aprobadores{% endblock %}
+{% block content %}
+<h1>👤 Gestión de Aprobadores</h1>
+<a href="/dashboard" class="btn btn-secondary">← Volver al Dashboard</a>
+<div class="card mt-3">
+    <div class="card-body">
+        <h5>Lista de Aprobadores ({{ aprobadores|length }} encontrados)</h5>
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Rol</th>
+                        <th>Oficina</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if aprobadores %}
+                    {% for apr in aprobadores %}
+                    <tr>
+                        <td>{{ apr.id }}</td>
+                        <td>{{ apr.nombre }}</td>
+                        <td>
+                            {% if apr.rol == 'administrador' %}
+                            <span class="badge bg-danger">Administrador</span>
+                            {% elif apr.rol == 'aprobador' %}
+                            <span class="badge bg-success">Aprobador</span>
+                            {% elif apr.rol == 'oficina_principal' %}
+                            <span class="badge bg-primary">Oficina Principal</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ apr.oficina_id }}</td>
+                        <td><span class="badge bg-success">Activo</span></td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center">No se encontraron aprobadores</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

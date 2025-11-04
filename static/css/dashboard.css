@@ -1,0 +1,86 @@
+/* ===== Dashboard ===== */
+.dashboard-header h1 {
+    color: #A73493;
+    font-weight: 700;
+}
+
+.dashboard-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+}
+
+/* ===== Tarjetas ===== */
+.stats-card {
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-align: center;
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+    .stats-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 14px rgba(0,0,0,0.15);
+    }
+
+    /* Colores personalizados */
+    .stats-card.materiales {
+        background-color: #A73493;
+    }
+
+    .stats-card.oficinas {
+        background-color: #0098B1;
+    }
+
+    .stats-card.solicitudes {
+        background-color: #D9D9D9;
+        color: #000;
+    }
+
+    .stats-card.aprobadores {
+        background-color: #6C757D;
+    }
+
+/* ===== Acciones Rápidas ===== */
+.quick-actions {
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+    .quick-actions h5 {
+        color: #A73493;
+        font-weight: 600;
+    }
+
+/* ===== Permisos ===== */
+.permissions-card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    border-radius: 10px;
+}
+
+    .permissions-card .card-header {
+        background-color: #A73493;
+        color: #fff;
+        border-radius: 10px 10px 0 0;
+    }
+
+    .permissions-card .list-group-item {
+        border: none;
+        border-bottom: 1px solid #eee;
+        padding: 0.75rem 1rem;
+    }
+
+/* ===== Responsividad ===== */
+@media (max-width: 768px) {
+    .dashboard-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .stats-card {
+        padding: 1rem;
+    }
+}

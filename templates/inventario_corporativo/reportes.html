@@ -1,0 +1,233 @@
+{% extends "base.html" %}
+{% block title %}Reportes - Inventario Corporativo{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/inventario_corporativo.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid fade-in-up">
+    <!-- Header -->
+    <div class="inv-header mb-4">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <h1 class="h2 mb-2"><i class="fas fa-chart-bar me-2"></i>Reportes del Inventario</h1>
+                <p class="mb-0 opacity-75">Análisis completo y estadísticas del inventario corporativo</p>
+            </div>
+            <div class="col-md-4 text-end">
+                <div class="btn-group">
+                    <button class="btn btn-inv-outline">
+                        <i class="fas fa-download me-1"></i> Exportar
+                    </button>
+                    <button class="btn btn-inv-primary">
+                        <i class="fas fa-print me-1"></i> Imprimir
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Estadísticas Rápidas -->
+    <div class="row mb-4">
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="inv-stats-card stats-primary p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Total Productos</h6>
+                        <h3 class="fw-bold text-primary mb-0">{{ estadisticas.total_productos }}</h3>
+                    </div>
+                    <div class="icon-container icon-container-primary">
+                        <i class="fas fa-boxes"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="inv-stats-card stats-success p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Valor Total</h6>
+                        <h3 class="fw-bold text-success mb-0">${{ "{:,.0f}".format(estadisticas.valor_total) }}</h3>
+                    </div>
+                    <div class="icon-container icon-container-success">
+                        <i class="fas fa-dollar-sign"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="inv-stats-card stats-warning p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Stock Bajo</h6>
+                        <h3 class="fw-bold text-warning mb-0">{{ estadisticas.stock_bajo }}</h3>
+                    </div>
+                    <div class="icon-container icon-container-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="inv-stats-card stats-info p-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Asignables</h6>
+                        <h3 class="fw-bold text-info mb-0">{{ estadisticas.asignables }}</h3>
+                    </div>
+                    <div class="icon-container icon-container-info">
+                        <i class="fas fa-share-square"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-xl-2 col-md-4 mb-3">
+            <div class="inv-stats-card p-3" style="border-left-color: #6f42c1;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Categorías</h6>
+                        <h3 class="fw-bold mb-0" style="color: #6f42c1;">{{ estadisticas.total_categorias }}</h3>
+                    </div>
+                    <div class="icon-container" style="background: #6f42c1; color: white;">
+                        <i class="fas fa-tags"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección de Reportes -->
+    <div class="row">
+        <!-- Productos por Oficina -->
+        <div class="col-lg-6 mb-4">
+            <div class="inv-card">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="mb-0"><i class="fas fa-building me-2"></i>Productos por Oficina</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Oficina</th>
+                                    <th class="text-end">Productos</th>
+                                    <th class="text-end">Stock</th>
+                                    <th class="text-end">Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in productos_por_oficina %}
+                                <tr>
+                                    <td>{{ item.oficina }}</td>
+                                    <td class="text-end">{{ item.total_productos }}</td>
+                                    <td class="text-end">{{ item.total_stock }}</td>
+                                    <td class="text-end">${{ "{:,.0f}".format(item.valor_total) }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">No hay datos disponibles</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stock Bajo -->
+        <div class="col-lg-6 mb-4">
+            <div class="inv-card">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="mb-0"><i class="fas fa-exclamation-triangle me-2 text-warning"></i>Stock Bajo/Crítico</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th class="text-end">Stock</th>
+                                    <th class="text-end">Mínimo</th>
+                                    <th>Estado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for producto in stock_bajo %}
+                                <tr>
+                                    <td>{{ producto.NombreProducto }}</td>
+                                    <td class="text-end">{{ producto.CantidadDisponible }}</td>
+                                    <td class="text-end">{{ producto.CantidadMinima }}</td>
+                                    <td>
+                                        <span class="badge {% if producto.estado_stock == 'Crítico' %}stock-critico{% else %}stock-bajo{% endif %}">
+                                            {{ producto.estado_stock }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">¡Excelente! No hay productos con stock bajo</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Movimientos Recientes -->
+        <div class="col-12 mb-4">
+            <div class="inv-card">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="mb-0"><i class="fas fa-history me-2"></i>Movimientos Recientes</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Producto</th>
+                                    <th>Oficina</th>
+                                    <th>Acción</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th>Usuario</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for movimiento in movimientos_recientes %}
+                                <tr>
+                                    <td>{{ movimiento.Fecha.strftime('%d/%m/%Y %H:%M') if movimiento.Fecha else 'N/A' }}</td>
+                                    <td>{{ movimiento.NombreProducto }}</td>
+                                    <td>{{ movimiento.oficina or 'Sede Principal' }}</td>
+                                    <td>
+                                        <span class="badge {% if movimiento.Accion == 'ASIGNAR' %}bg-success{% else %}bg-secondary{% endif %}">
+                                            {{ movimiento.Accion }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">{{ movimiento.Cantidad }}</td>
+                                    <td>{{ movimiento.UsuarioAccion }}</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center text-muted">No hay movimientos recientes</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Reportes de inventario cargados correctamente');
+});
+</script>
+{% endblock %}
