@@ -1,14 +1,14 @@
-# Python
+# Ignorar archivos de Python
 __pycache__/
 *.pyc
 *.pyo
 
-# Visual Studio / VS Code
+# Archivos de Visual Studio
 .vs/
 *.vsidx
 *.user
 *.suo
 
-# Otros temporales
+# Otros archivos temporales
 *.log
 *.tmp
