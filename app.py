@@ -21,9 +21,17 @@ from routes_inventario_corporativo import bp_inv as bp_inventario_corporativo
 from database import get_database_connection
 
 # Configuración de la aplicación
-app = Flask(__name__)
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BASE_DIR, 'templates'),
+    static_folder=os.path.join(BASE_DIR, 'static')
+)
+
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
 app.config['JSON_AS_ASCII'] = False
+app.config['TEMPLATES_AUTO_RELOAD'] = True  # útil en desarrollo
 
 # Configuración de uploads
 UPLOAD_FOLDER = 'static/uploads'

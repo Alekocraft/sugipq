@@ -1,58 +1,107 @@
-﻿<!-- En templates/prestamos/elemento_crear.html -->
-{% extends "base.html" %}
-
+﻿{% extends "base.html" %}
 {% block title %}Crear Material - Préstamos{% endblock %}
 
 {% block content %}
 <div class="container fade-in">
-    <!-- Encabezado con botón Volver -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="fw-bold" style="color: #A73493;">
             <i class="fas fa-plus-circle"></i> Crear Material para Préstamos
         </h1>
-        <a href="/dashboard" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Volver al Dashboard
+        <a href="{{ url_for('prestamos.listar') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Volver a Préstamos
         </a>
     </div>
 
-    <!-- Formulario para crear material -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+    </div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
     <div class="card border-0 shadow-sm">
         <div class="card-body">
-            <form method="POST" enctype="multipart/form-data">
-                <!-- Tus campos del formulario aquí -->
-                <div class="row mb-3">
+            <form method="post" action="{{ url_for('prestamos.crear_elemento_publicitario_post') }}" enctype="multipart/form-data">
+                <div class="row g-3">
                     <div class="col-md-6">
-                        <label for="nombre_elemento" class="form-label">Nombre del Material</label>
-                        <input type="text" class="form-control" id="nombre_elemento" name="nombre_elemento" required>
+                        <label class="form-label">Nombre del Elemento*</label>
+                        <input type="text" name="nombre_elemento" class="form-control" required
+                               placeholder="Ej: Banner publicitario, Folletos, etc.">
                     </div>
+
                     <div class="col-md-3">
-                        <label for="valor_unitario" class="form-label">Valor Unitario</label>
-                        <input type="number" step="0.01" class="form-control" id="valor_unitario" name="valor_unitario" required>
+                        <label class="form-label">Valor unitario*</label>
+                        <div class="input-group">
+                            <span class="input-group-text">$</span>
+                            <input type="number" name="valor_unitario" class="form-control"
+                                   step="0.01" min="0.01" value="0.01" required>
+                        </div>
                     </div>
+
                     <div class="col-md-3">
-                        <label for="cantidad_disponible" class="form-label">Cantidad Disponible</label>
-                        <input type="number" class="form-control" id="cantidad_disponible" name="cantidad_disponible" required>
+                        <label class="form-label">Cantidad disponible*</label>
+                        <input type="number" name="cantidad_disponible" class="form-control"
+                               min="0" value="0" required>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Imagen del elemento*</label>
+                        <input type="file" name="imagen" class="form-control" accept="image/*" required>
+                        <div class="form-text">
+                            Formatos aceptados: JPG, PNG, GIF. Tamaño máximo: 16MB
+                        </div>
+                    </div>
+
+                    <!-- Preview del valor total -->
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <strong>Resumen:</strong>
+                            <div id="valor-total-preview">
+                                Valor total calculado: $<span id="valor-total">0.00</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="imagen" class="form-label">Imagen (opcional)</label>
-                        <input type="file" class="form-control" id="imagen" name="imagen" accept="image/*">
-                    </div>
-                </div>
-
-                <!-- Botones de acción -->
-                <div class="d-flex gap-2">
+                <div class="mt-3 d-flex gap-2">
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Crear Material
                     </button>
-                    <a href="/dashboard" class="btn btn-outline-secondary">
-                        <i class="fas fa-arrow-left"></i> Volver al Dashboard
+                    <a href="{{ url_for('prestamos.listar') }}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left"></i> Volver
                     </a>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+{% block scripts %}
+<script>
+    // Cálculo en tiempo real del valor total
+    document.addEventListener('DOMContentLoaded', function() {
+        const valorUnitarioInput = document.querySelector('input[name="valor_unitario"]');
+        const cantidadInput = document.querySelector('input[name="cantidad_disponible"]');
+        const valorTotalSpan = document.getElementById('valor-total');
+
+        function calcularValorTotal() {
+            const valorUnitario = parseFloat(valorUnitarioInput.value) || 0;
+            const cantidad = parseInt(cantidadInput.value) || 0;
+            const valorTotal = valorUnitario * cantidad;
+
+            valorTotalSpan.textContent = valorTotal.toFixed(2);
+        }
+
+        valorUnitarioInput.addEventListener('input', calcularValorTotal);
+        cantidadInput.addEventListener('input', calcularValorTotal);
+
+        // Calcular valor inicial
+        calcularValorTotal();
+    });
+</script>
+{% endblock %}
 {% endblock %}
