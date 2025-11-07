@@ -4,7 +4,6 @@ from datetime import datetime
 from flask import Flask, render_template, request, redirect, session, flash, jsonify, url_for
 from werkzeug.utils import secure_filename
 
-
 # Importar modelos
 from models.materiales_model import MaterialModel
 from models.oficinas_model import OficinaModel
@@ -14,7 +13,6 @@ from models.inventario_corporativo_model import InventarioCorporativoModel
 
 # Importar blueprints con alias para consistencia
 from routes_prestamos import bp_prestamos
-
 from routes_inventario_corporativo import bp_inv as bp_inventario_corporativo
 
 # Importar conexión a base de datos
@@ -38,7 +36,6 @@ UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 
-
 # Crear directorio de uploads si no existe
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 print(f"✅ Directorio de uploads: {os.path.abspath(UPLOAD_FOLDER)}")
@@ -52,9 +49,58 @@ print("✅ Blueprints registrados:")
 for name in app.blueprints:
     print(f"   - {name}")
 
-# Importar y registrar otras rutas si es necesario
-# from routes_materiales import bp_materiales
-# app.register_blueprint(bp_materiales)
+# ============================================================================
+# INICIALIZACIÓN DE DATOS - OFICINA SEDE PRINCIPAL
+# ============================================================================
+def inicializar_oficina_principal():
+    """Verifica y crea la oficina Sede Principal si no existe"""
+    try:
+        print("🔍 Verificando existencia de oficina 'Sede Principal'...")
+        oficina_principal = OficinaModel.obtener_por_nombre("Sede Principal")
+
+        if not oficina_principal:
+            print("📝 Creando oficina 'Sede Principal'...")
+            conn = get_database_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO Oficinas (
+                    NombreOficina, 
+                    DirectorOficina, 
+                    Ubicacion, 
+                    EsPrincipal, 
+                    Activo, 
+                    FechaCreacion,
+                    Email
+                ) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                "Sede Principal",
+                "Director General",
+                "Ubicación Principal",
+                1,  # EsPrincipal = True
+                1,  # Activo = True
+                datetime.now(),
+                "sede.principal@empresa.com"
+            ))
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+            print("✅ Oficina 'Sede Principal' creada exitosamente")
+
+            # Verificar que se creó correctamente
+            oficina_verificada = OficinaModel.obtener_por_nombre("Sede Principal")
+            if oficina_verificada:
+                print(f"✅ Verificación exitosa - ID: {oficina_verificada['id']}")
+            else:
+                print("⚠️ Advertencia: No se pudo verificar la creación de la oficina")
+        else:
+            print(f"✅ Oficina 'Sede Principal' ya existe - ID: {oficina_principal['id']}")
+    except Exception as e:
+        print(f"❌ Error inicializando oficina principal: {e}")
+        import traceback
+        print(f"🔍 TRACEBACK: {traceback.format_exc()}")
 
 # ============================================================================
 # FUNCIONES HELPER PARA FILTROS POR OFICINA - ACTUALIZADO
@@ -65,18 +111,18 @@ def filtrar_por_oficina_usuario(datos, campo_oficina_id='oficina_id'):
     """
     if 'rol' not in session:
         return []
-    
+
     rol = session['rol']
     oficina_id_usuario = session.get('oficina_id')
-    
+
     # Roles con acceso total
     if rol in ['administrador', 'lider_inventario']:
         return datos
-    
+
     # Roles restringidos a su oficina
     if rol in ['oficina_principal', 'aprobador', 'tesoreria']:
         return [item for item in datos if item.get(campo_oficina_id) == oficina_id_usuario]
-    
+
     return []
 
 def verificar_acceso_oficina(oficina_id):
@@ -85,18 +131,18 @@ def verificar_acceso_oficina(oficina_id):
     """
     if 'rol' not in session:
         return False
-    
+
     rol = session['rol']
     oficina_id_usuario = session.get('oficina_id')
-    
+
     # Roles con acceso total
     if rol in ['administrador', 'lider_inventario']:
         return True
-    
+
     # Roles restringidos a su oficina
     if rol in ['oficina_principal', 'aprobador', 'tesoreria']:
         return oficina_id == oficina_id_usuario
-    
+
     return False
 
 # ============================================================================
@@ -200,7 +246,7 @@ def dashboard():
 def listar_materiales():
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin y lider_inventario pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario']:
@@ -221,42 +267,56 @@ def listar_materiales():
 def crear_material():
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin y lider_inventario pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario']:
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/dashboard')
-    
+
     if request.method == 'GET':
         return render_template('materials/crear.html')
-    
+
     # POST METHOD - SOLUCIÓN DEFINITIVA
     try:
         print("=== INICIANDO CREACIÓN DE MATERIAL ===")
-        
-        # Obtener oficina principal
+
+        # Obtener oficina principal - USANDO EL NUEVO FLUJO TOLERANTE
         oficina_principal = OficinaModel.obtener_por_nombre("Sede Principal")
         if not oficina_principal:
-            flash('No se encontró la oficina "Sede Principal"', 'danger')
-            return render_template('materials/crear.html')      
+            # Si no existe, obtener la marcada como principal (si tu modelo lo expone)
+            if hasattr(OficinaModel, 'obtener_oficina_principal'):
+                oficina_principal = OficinaModel.obtener_oficina_principal()
+
+        if not oficina_principal:
+            # Si aún no hay oficina, usar la primera disponible
+            todas_oficinas = OficinaModel.obtener_todas() or []
+            if todas_oficinas:
+                oficina_principal = todas_oficinas[0]
+                print(f"⚠️ Usando primera oficina disponible: {oficina_principal.get('nombre')}")
+            else:
+                flash('❌ Error crítico: No hay oficinas disponibles en el sistema. Contacte al administrador.', 'danger')
+                return render_template('materials/crear.html')
+
         oficina_id = oficina_principal['id']
+        print(f"✅ Usando oficina ID: {oficina_id} - {oficina_principal.get('nombre', 'Sede Principal')}")
+
         errores = []
         materiales_creados = []
-        
+
         for i in range(10):
             nombre_key = f'nombre_{i}'
             if nombre_key not in request.form or not request.form[nombre_key].strip():
                 continue
-                
+
             try:
                 nombre = request.form.get(f'nombre_{i}', '').strip()
                 valor_unitario = float(request.form.get(f'valor_unitario_{i}', 0.0))
                 cantidad = int(request.form.get(f'cantidad_{i}', 0))
                 imagen = request.files.get(f'imagen_{i}')
-                
+
                 print(f"🔍 Procesando material {i}: {nombre}")
-                
+
                 # Validaciones
                 if not nombre:
                     errores.append(f"Material {i+1}: Nombre es obligatorio.")
@@ -270,26 +330,24 @@ def crear_material():
                 if not imagen or imagen.filename == '':
                     errores.append(f"Material {i+1} ({nombre}): Imagen es obligatoria.")
                     continue
-                
+
                 # Procesar imagen
                 filename = secure_filename(imagen.filename)
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                
+
                 # Verificar que el directorio existe
                 os.makedirs(os.path.dirname(filepath), exist_ok=True)
-                
+
                 # Guardar la imagen
                 imagen.save(filepath)
                 print(f"✅ Imagen guardada en disco: {filepath}")
-                
-                # Ruta para la base de datos - CORREGIDO: usar ruta relativa correcta
+
+                # Ruta para la base de datos - usar ruta relativa servible
                 ruta_imagen = f"uploads/{filename}"
                 print(f"✅ Ruta de imagen para BD: '{ruta_imagen}'")
-                
+
                 # Obtener usuario creador
-                usuario_creador = session.get('usuario_nombre', 'Sistema')
-                if not usuario_creador:
-                    usuario_creador = session.get('usuario', 'Sistema')
+                usuario_creador = session.get('usuario_nombre', 'Sistema') or session.get('usuario', 'Sistema')
 
                 # ✅ CREACIÓN DIRECTA CON IMAGEN
                 print("🔍 CREANDO MATERIAL CON IMAGEN...")
@@ -304,30 +362,33 @@ def crear_material():
 
                 if material_id:
                     print(f"✅ Material creado con ID: {material_id}")
-                    
+
                     # ✅ VERIFICACIÓN INMEDIATA
                     material_verificado = MaterialModel.obtener_por_id(material_id)
                     if material_verificado:
-                        if material_verificado['ruta_imagen']:
+                        if material_verificado.get('ruta_imagen'):
                             print(f"🎉 VERIFICACIÓN: Imagen guardada - '{material_verificado['ruta_imagen']}'")
                             materiales_creados.append(nombre)
                         else:
                             print(f"⚠️ ADVERTENCIA: Imagen no se guardó para material {material_id}")
                             # Intentar actualizar solo la imagen
                             print("🔄 Intentando actualizar solo la imagen...")
-                            resultado_update = MaterialModel.actualizar_imagen(material_id, ruta_imagen)
-                            if resultado_update:
-                                print(f"✅ Imagen actualizada correctamente para material {material_id}")
-                                materiales_creados.append(nombre)
+                            if hasattr(MaterialModel, 'actualizar_imagen'):
+                                resultado_update = MaterialModel.actualizar_imagen(material_id, ruta_imagen)
+                                if resultado_update:
+                                    print(f"✅ Imagen actualizada correctamente para material {material_id}")
+                                    materiales_creados.append(nombre)
+                                else:
+                                    errores.append(f"Material {i+1} ({nombre}): Error al guardar imagen.")
                             else:
-                                errores.append(f"Material {i+1} ({nombre}): Error al guardar imagen.")
+                                errores.append(f"Material {i+1} ({nombre}): El modelo no permite actualizar imagen.")
                     else:
                         print(f"⚠️ No se pudo verificar material {material_id}")
                         errores.append(f"Material {i+1} ({nombre}): Error al verificar creación.")
                 else:
                     print(f"❌ Error al crear material: {nombre}")
                     errores.append(f"Material {i+1} ({nombre}): Error en base de datos.")
-                    
+
             except ValueError as ve:
                 print(f"❌ Error de valor: {ve}")
                 errores.append(f"Material {i+1}: Valores numéricos inválidos.")
@@ -336,17 +397,17 @@ def crear_material():
                 import traceback
                 print(f"🔍 TRACEBACK: {traceback.format_exc()}")
                 errores.append(f"Material {i+1} ({nombre or 'Desconocido'}): Error interno del sistema.")
-        
+
         # Mostrar resultados
         if errores:
             for error in errores:
                 flash(error, 'danger')
-                
+
         if materiales_creados:
             flash(f'✅ ¡{len(materiales_creados)} material(es) creado(s) exitosamente!', 'success')
-        
+
         return render_template('materials/crear.html')
-        
+
     except Exception as e:
         print(f"❌ Error crítico en crear_material: {e}")
         import traceback
@@ -358,22 +419,22 @@ def crear_material():
 def editar_material(material_id):
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin y lider_inventario pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario']:
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/dashboard')
-    
+
     try:
         if request.method == 'POST':
             print(f"🔍 Procesando edición del material {material_id}")
-            
+
             # Obtener datos del formulario
             nombre = request.form.get('nombre')
             valor_unitario_str = request.form.get('valor_unitario', '0')
             cantidad_str = request.form.get('cantidad', '0')
-            
+
             # Validar y convertir datos
             try:
                 valor_unitario = float(valor_unitario_str)
@@ -381,17 +442,17 @@ def editar_material(material_id):
             except ValueError:
                 flash('Error: Los valores numéricos no son válidos', 'danger')
                 return redirect(f'/materiales/editar/{material_id}')
-            
+
             # Obtener material actual
             material_actual = MaterialModel.obtener_por_id(material_id)
             if not material_actual:
                 flash('Material no encontrado', 'danger')
                 return redirect('/materiales')
-                
+
             oficina_id = material_actual['oficina_id']
             imagen = request.files.get('imagen')
             ruta_imagen = material_actual['ruta_imagen']
-            
+
             # Procesar nueva imagen si se proporciona
             if imagen and imagen.filename != '':
                 try:
@@ -404,7 +465,7 @@ def editar_material(material_id):
                     print(f"❌ Error guardando nueva imagen: {e}")
                     flash('Error al guardar la nueva imagen', 'danger')
                     return redirect(f'/materiales/editar/{material_id}')
-            
+
             # Actualizar material
             resultado = MaterialModel.actualizar(
                 material_id=material_id,
@@ -414,25 +475,25 @@ def editar_material(material_id):
                 oficina_id=oficina_id,
                 ruta_imagen=ruta_imagen
             )
-            
+
             if resultado:
                 flash('Material actualizado exitosamente', 'success')
                 return redirect('/materiales')
             else:
                 flash('Error al actualizar el material', 'danger')
                 return redirect(f'/materiales/editar/{material_id}')
-        
+
         # GET request - mostrar formulario de edición
         print(f"🔍 Cargando formulario de edición para material {material_id}")
         material = MaterialModel.obtener_por_id(material_id)
-        
+
         if not material:
             flash('Material no encontrado', 'danger')
             return redirect('/materiales')
-        
+
         print(f"✅ Material cargado: {material['nombre']}")
         return render_template('materials/editar.html', material=material)
-        
+
     except Exception as e:
         print(f"❌ Error en editar_material: {e}")
         import traceback
@@ -444,7 +505,7 @@ def editar_material(material_id):
 def eliminar_material(material_id):
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin y lider_inventario pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario']:
@@ -469,13 +530,13 @@ def eliminar_material(material_id):
 def listar_oficinas():
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin, lider_inventario y oficina_principal
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario', 'oficina_principal']:
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/dashboard')
-    
+
     try:
         oficinas = OficinaModel.obtener_todas() or []
         return render_template('oficinas/listar.html', oficinas=oficinas)
@@ -488,7 +549,7 @@ def listar_oficinas():
 def detalle_oficina(oficina_id):
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # Verificar acceso a la oficina
     if not verificar_acceso_oficina(oficina_id):
         flash('No tiene permisos para acceder a esta oficina', 'danger')
@@ -499,14 +560,14 @@ def detalle_oficina(oficina_id):
         if not oficina:
             flash('Oficina no encontrada', 'danger')
             return redirect('/oficinas')
-        
+
         # Obtener y filtrar datos por oficina
         todos_materiales = MaterialModel.obtener_todos() or []
         todas_solicitudes = SolicitudModel.obtener_todas() or []
-        
+
         materiales_oficina = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
         solicitudes_oficina = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
-        
+
         return render_template('oficinas/detalle.html',
                             oficina=oficina,
                             materiales=materiales_oficina,
@@ -523,17 +584,17 @@ def detalle_oficina(oficina_id):
 def listar_solicitudes():
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ Todos EXCEPTO tesoreria
     rol = session.get('rol', '')
     if rol == 'tesoreria':
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/reportes')
-    
+
     try:
         # Obtener TODAS las solicitudes sin filtrar aún
         todas_solicitudes = SolicitudModel.obtener_todas() or []
-        
+
         # ✅ CORRECCIÓN CLAVE: Solo filtrar si NO es administrador ni lider_inventario
         if rol in ['administrador', 'lider_inventario']:
             solicitudes = todas_solicitudes  # Acceso total
@@ -603,20 +664,20 @@ def mostrar_formulario_solicitud():
     """Muestra el formulario para crear solicitud"""
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ Todos EXCEPTO tesoreria
     rol = session.get('rol', '')
     if rol == 'tesoreria':
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/reportes')
-        
+
     print("Mostrando formulario de creación (GET)")
     try:
         # ✅ CORRECCIÓN: Obtener TODOS los materiales sin filtrar por oficina
         materiales = MaterialModel.obtener_todos() or []
-        
+
         print(f"✅ Materiales cargados para formulario: {len(materiales)}")
-        
+
         return render_template('solicitudes/crear.html', 
                              materiales=materiales)
     except Exception as e:
@@ -629,13 +690,13 @@ def procesar_solicitud():
     """Procesa el formulario de creación de solicitud usando el SP"""
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ Todos EXCEPTO tesoreria
     rol = session.get('rol', '')
     if rol == 'tesoreria':
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/reportes')
-    
+
     print("Procesando formulario (POST)")
     try:
         oficina_id = request.form.get('oficina_id')
@@ -699,7 +760,7 @@ def procesar_solicitud():
     except Exception as e:
         print(f"ERROR en crear_solicitud: {e}")
         error_msg = str(e)
-        
+
         # Manejar errores específicos del stored procedure
         if 'Límite mensual' in error_msg:
             flash('Límite mensual de 1000 elementos excedido para esta oficina. No puede crear más solicitudes este mes.', 'error')
@@ -709,7 +770,7 @@ def procesar_solicitud():
             flash('La cantidad solicitada no es válida. Verifique los límites.', 'error')
         else:
             flash('Error interno del servidor: ' + error_msg, 'error')
-        
+
         return redirect('/solicitudes/crear')
 
 # ============================================================================
@@ -719,20 +780,20 @@ def procesar_solicitud():
 def aprobar_solicitud(solicitud_id):
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ Todos EXCEPTO tesoreria
     rol = session.get('rol', '')
     if rol == 'tesoreria':
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/reportes')
-    
+
     try:
         # Verificar acceso a la solicitud
         solicitud = SolicitudModel.obtener_por_id(solicitud_id)
         if not solicitud or not verificar_acceso_oficina(solicitud.get('oficina_id')):
             flash('No tiene permisos para aprobar esta solicitud', 'danger')
             return redirect('/solicitudes')
-            
+
         usuario_id = session['usuario_id']
         success, message = SolicitudModel.aprobar(solicitud_id, usuario_id)
         if success:
@@ -748,27 +809,27 @@ def aprobar_solicitud(solicitud_id):
 def aprobar_parcial_solicitud(solicitud_id):
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ Todos EXCEPTO tesoreria
     rol = session.get('rol', '')
     if rol == 'tesoreria':
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/reportes')
-    
+
     try:
         # Verificar acceso a la solicitud
         solicitud = SolicitudModel.obtener_por_id(solicitud_id)
         if not solicitud or not verificar_acceso_oficina(solicitud.get('oficina_id')):
             flash('No tiene permisos para aprobar esta solicitud', 'danger')
             return redirect('/solicitudes')
-            
+
         usuario_id = session['usuario_id']
         cantidad_aprobada = int(request.form.get('cantidad_aprobada', 0))
-        
+
         if cantidad_aprobada <= 0:
             flash('La cantidad aprobada debe ser mayor que 0', 'danger')
             return redirect('/solicitudes')
-        
+
         success, message = SolicitudModel.aprobar_parcial(solicitud_id, usuario_id, cantidad_aprobada)
         if success:
             flash(message, 'success')
@@ -785,20 +846,20 @@ def aprobar_parcial_solicitud(solicitud_id):
 def rechazar_solicitud(solicitud_id):
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ Todos EXCEPTO tesoreria
     rol = session.get('rol', '')
     if rol == 'tesoreria':
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/reportes')
-    
+
     try:
         # Verificar acceso a la solicitud
         solicitud = SolicitudModel.obtener_por_id(solicitud_id)
         if not solicitud or not verificar_acceso_oficina(solicitud.get('oficina_id')):
             flash('No tiene permisos para rechazar esta solicitud', 'danger')
             return redirect('/solicitudes')
-            
+
         usuario_id = session['usuario_id']
         observacion = request.form.get('observacion', '')
         if SolicitudModel.rechazar(solicitud_id, usuario_id, observacion):
@@ -817,13 +878,13 @@ def rechazar_solicitud(solicitud_id):
 def listar_aprobadores():
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin, lider_inventario y oficina_principal
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario', 'oficina_principal']:
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/dashboard')
-    
+
     try:
         aprobadores = UsuarioModel.obtener_aprobadores() or []
         return render_template('aprobadores/listar.html', aprobadores=aprobadores)
@@ -853,7 +914,6 @@ def listar_inventario_corporativo():
         productos=productos,
         total_productos=total_productos
     )
-
 
 @app.route('/inventario-corporativo/crear', methods=['GET', 'POST'])
 def crear_inventario_corporativo():
@@ -897,8 +957,7 @@ def crear_inventario_corporativo():
                 # Guardamos la ruta para la BD (ruta relativa que puedas servir)
                 ruta_imagen = '/' + filepath.replace('\\', '/')
 
-            # Crear en BD usando TU modelo (ya implementado)
-            # INSERT INTO ProductosCorporativos (...) VALUES (...)  -> lastrowid
+            # Crear en BD usando el modelo
             nuevo_id = InventarioCorporativoModel.crear(
                 codigo_unico=codigo_unico,
                 nombre=nombre,
@@ -912,7 +971,7 @@ def crear_inventario_corporativo():
                 es_asignable=es_asignable,
                 usuario_creador=usuario_creador,
                 ruta_imagen=ruta_imagen
-            )  # devuelve id o None. :contentReference[oaicite:2]{index=2}
+            )
 
             if nuevo_id:
                 flash('✅ Producto corporativo creado correctamente.', 'success')
@@ -925,42 +984,36 @@ def crear_inventario_corporativo():
             flash('❌ Ocurrió un error al guardar.', 'danger')
 
         # Si algo falla, re-renderizamos el formulario con las listas
-        return render_template('inventario_corporativo/crear.html',
+        return render_template('inventario_corporportivo/crear.html',
                                categorias=categorias, proveedores=proveedores)
 
     # GET → solo pintar formulario con listas
     return render_template('inventario_corporativo/crear.html',
                            categorias=categorias, proveedores=proveedores)
 
- 
 # ============================================================================
 # RUTAS DE INVENTARIO CORPORATIVO CON FILTROS
 # ============================================================================
-
-# ============================================================================
-# RUTAS DE INVENTARIO CORPORATIVO CON FILTROS
-# ============================================================================
-
 @app.route('/api/inventario-corporativo/estadisticas')
 def api_estadisticas_inventario_corporativo():
     """API para obtener estadísticas del inventario corporativo"""
     if 'usuario_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
-    
+
     # ✅ SOLO admin, lider_inventario e inventario_corporativo pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario', 'inventario_corporativo']:
         return jsonify({'error': 'No tiene permisos para acceder a esta sección'}), 403
-    
+
     try:
         # Obtener todos los productos CON información de oficina
         productos = InventarioCorporativoModel.obtener_todos_con_oficina() or []
-        
+
         # Calcular estadísticas
         total_productos = len(productos)
         productos_sede = len([p for p in productos if p.get('oficina', 'Sede Principal') == 'Sede Principal'])
         productos_oficinas = total_productos - productos_sede
-        
+
         return jsonify({
             'total_productos': total_productos,
             'productos_sede': productos_sede,
@@ -975,13 +1028,13 @@ def inventario_corporativo_sede_principal():
     """Vista filtrada para Sede Principal"""
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin, lider_inventario e inventario_corporativo pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario', 'inventario_corporativo']:
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/dashboard')
-    
+
     return listar_inventario_corporativo_filtrado('sede')
 
 @app.route('/inventario-corporativo/oficinas-servicio')
@@ -989,13 +1042,13 @@ def inventario_corporativo_oficinas_servicio():
     """Vista filtrada para Oficinas de Servicio (excluye Sede Principal)"""
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin, lider_inventario e inventario_corporativo pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario', 'inventario_corporativo']:
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/dashboard')
-    
+
     return listar_inventario_corporativo_filtrado('oficinas')
 
 @app.route('/inventario-corporativo/filtrado/<tipo>')
@@ -1003,25 +1056,25 @@ def listar_inventario_corporativo_filtrado(tipo):
     """Vista principal con filtros para inventario corporativo"""
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin, lider_inventario e inventario_corporativo pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario', 'inventario_corporativo']:
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/dashboard')
-    
+
     try:
         # Obtener parámetros de filtro
         filtro_oficina = request.args.get('oficina', '')
         filtro_categoria = request.args.get('categoria', '')
         filtro_stock = request.args.get('stock', '')
-        
+
         # Obtener todos los productos CON información de oficina
         productos = InventarioCorporativoModel.obtener_todos_con_oficina() or []
-        
+
         # Obtener oficinas para el filtro
         oficinas_db = InventarioCorporativoModel.obtener_oficinas() or []
-        
+
         if tipo == 'sede':
             # Solo productos de Sede Principal
             productos = [p for p in productos if p.get('oficina', 'Sede Principal') == 'Sede Principal']
@@ -1040,10 +1093,10 @@ def listar_inventario_corporativo_filtrado(tipo):
             titulo = "Inventario Corporativo"
             subtitulo = "Todos los productos corporativos"
             oficinas_filtradas = [{'nombre': 'Sede Principal'}] + [{'nombre': of['nombre']} for of in oficinas_db if of['nombre'] != 'Sede Principal']
-        
+
         # Aplicar filtros adicionales
         productos_filtrados = productos.copy()
-        
+
         if filtro_oficina:
             if filtro_oficina == 'Sede Principal':
                 productos_filtrados = [p for p in productos_filtrados if p.get('oficina', 'Sede Principal') == 'Sede Principal']
@@ -1051,10 +1104,10 @@ def listar_inventario_corporativo_filtrado(tipo):
                 productos_filtrados = [p for p in productos_filtrados if p.get('oficina', 'Sede Principal') != 'Sede Principal']
             else:
                 productos_filtrados = [p for p in productos_filtrados if p.get('oficina', '') == filtro_oficina]
-        
+
         if filtro_categoria:
             productos_filtrados = [p for p in productos_filtrados if p.get('categoria', '').lower() == filtro_categoria.lower()]
-        
+
         if filtro_stock:
             if filtro_stock == 'bajo':
                 productos_filtrados = [p for p in productos_filtrados if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)]
@@ -1062,20 +1115,20 @@ def listar_inventario_corporativo_filtrado(tipo):
                 productos_filtrados = [p for p in productos_filtrados if p.get('cantidad', 0) > p.get('cantidad_minima', 5)]
             elif filtro_stock == 'sin':
                 productos_filtrados = [p for p in productos_filtrados if p.get('cantidad', 0) == 0]
-        
+
         # Calcular estadísticas
         total_productos = len(productos_filtrados)
         valor_total = sum(p.get('valor_unitario', 0) * p.get('cantidad', 0) for p in productos_filtrados)
         productos_bajo_stock = len([p for p in productos_filtrados if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)])
-        
-        # Obtener categorías para el filtro - CORREGIDO
+
+        # Obtener categorías para el filtro
         categorias_db = InventarioCorporativoModel.obtener_categorias() or []
         categorias = [{'nombre': cat.get('nombre_categoria', '')} for cat in categorias_db]
-        
+
         print(f"✅ Categorías cargadas: {len(categorias)}")
         print(f"✅ Oficinas cargadas: {len(oficinas_filtradas)}")
         print(f"✅ Productos cargados: {len(productos_filtrados)}")
-        
+
         return render_template('inventario_corporativo/listar_con_filtros.html',
                             productos=productos_filtrados,
                             titulo=titulo,
@@ -1114,27 +1167,27 @@ def exportar_inventario_corporativo_excel(tipo):
     """Exportar inventario corporativo a Excel con filtros aplicados"""
     if 'usuario_id' not in session:
         return redirect('/login')
-    
+
     # ✅ SOLO admin, lider_inventario e inventario_corporativo pueden acceder
     rol = session.get('rol', '')
     if rol not in ['administrador', 'lider_inventario', 'inventario_corporativo']:
         flash('No tiene permisos para acceder a esta sección', 'danger')
         return redirect('/dashboard')
-    
+
     try:
         import pandas as pd
         from io import BytesIO
         from flask import send_file
         from datetime import datetime
-        
+
         # Obtener parámetros de filtro
         filtro_oficina = request.args.get('oficina', '')
         filtro_categoria = request.args.get('categoria', '')
         filtro_stock = request.args.get('stock', '')
-        
+
         # Obtener productos CON información de oficina
         productos = InventarioCorporativoModel.obtener_todos_con_oficina() or []
-        
+
         # Aplicar filtro por tipo
         if tipo == 'sede':
             productos = [p for p in productos if p.get('oficina', 'Sede Principal') == 'Sede Principal']
@@ -1145,7 +1198,7 @@ def exportar_inventario_corporativo_excel(tipo):
             sheet_name = 'Oficinas Servicio'
         else:
             sheet_name = 'Inventario Completo'
-        
+
         # Aplicar filtros adicionales
         if filtro_oficina:
             if filtro_oficina == 'Sede Principal':
@@ -1154,10 +1207,10 @@ def exportar_inventario_corporativo_excel(tipo):
                 productos = [p for p in productos if p.get('oficina', 'Sede Principal') != 'Sede Principal']
             else:
                 productos = [p for p in productos if p.get('oficina', '') == filtro_oficina]
-        
+
         if filtro_categoria:
             productos = [p for p in productos if p.get('categoria', '').lower() == filtro_categoria.lower()]
-        
+
         if filtro_stock:
             if filtro_stock == 'bajo':
                 productos = [p for p in productos if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)]
@@ -1165,7 +1218,7 @@ def exportar_inventario_corporativo_excel(tipo):
                 productos = [p for p in productos if p.get('cantidad', 0) > p.get('cantidad_minima', 5)]
             elif filtro_stock == 'sin':
                 productos = [p for p in productos if p.get('cantidad', 0) == 0]
-        
+
         # Crear DataFrame
         data = []
         for producto in productos:
@@ -1183,30 +1236,30 @@ def exportar_inventario_corporativo_excel(tipo):
                 'Asignable': 'Sí' if producto.get('es_asignable', False) else 'No',
                 'Estado Stock': 'Bajo' if producto.get('cantidad', 0) <= producto.get('cantidad_minima', 5) else 'Normal' if producto.get('cantidad', 0) > 0 else 'Sin Stock'
             })
-        
+
         df = pd.DataFrame(data)
-        
+
         # Crear archivo Excel en memoria
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name=sheet_name, index=False)
-            
+
             # Ajustar ancho de columnas
             worksheet = writer.sheets[sheet_name]
             for idx, col in enumerate(df.columns):
                 max_len = max(df[col].astype(str).str.len().max(), len(col)) + 2
                 worksheet.column_dimensions[chr(65 + idx)].width = min(max_len, 50)
-        
+
         output.seek(0)
-        
+
         # Nombre del archivo
         filename = f"inventario_corporativo_{sheet_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
-        
+
         return send_file(output, 
                         download_name=filename, 
                         as_attachment=True, 
                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        
+
     except Exception as e:
         print(f"❌ Error exportando a Excel: {e}")
         flash('Error al exportar el archivo Excel', 'danger')
@@ -1224,22 +1277,22 @@ def reportes_index():
         todas_solicitudes = SolicitudModel.obtener_todas() or []
         todos_materiales = MaterialModel.obtener_todos() or []
         todas_oficinas = OficinaModel.obtener_todas() or []
-        
+
         # Aplicar filtros por oficina según el rol
         solicitudes = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
         oficinas = filtrar_por_oficina_usuario(todas_oficinas)
-        
+
         # Calcular estadísticas con datos filtrados
         total_solicitudes = len(solicitudes)
         solicitudes_pendientes = len([s for s in solicitudes if s.get('estado', '').lower() == 'pendiente'])
         solicitudes_aprobadas = len([s for s in solicitudes if s.get('estado', '').lower() == 'aprobada'])
         solicitudes_rechazadas = len([s for s in solicitudes if s.get('estado', '').lower() == 'rechazada'])
-        
+
         materiales_bajo_stock = len([m for m in materiales if m.get('cantidad', 0) <= 10])
         valor_total_inventario = sum(m.get('valor_total', 0) or 0 for m in materiales)
         total_oficinas = len(oficinas)
-        
+
         return render_template('reportes/index.html',
                             total_solicitudes=total_solicitudes,
                             solicitudes_pendientes=solicitudes_pendientes,
@@ -1267,29 +1320,29 @@ def reporte_materiales():
         # Obtener y filtrar materiales
         todos_materiales = MaterialModel.obtener_todos() or []
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
-        
+
         # Obtener y filtrar solicitudes para estadísticas
         todas_solicitudes = SolicitudModel.obtener_todas() or []
         solicitudes_filtradas = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
-        
+
         # Calcular estadísticas con datos filtrados
         valor_total_inventario = sum(m.get('valor_total', 0) or 0 for m in materiales)
         total_solicitudes = len(solicitudes_filtradas)
         total_entregado = sum((m.get('cantidad', 0) or 0) for m in materiales)
-        
+
         # Crear stats_dict con datos filtrados
         stats_dict = {}
         for material in materiales:
             material_id = material['id']
             solicitudes_mat = [s for s in solicitudes_filtradas if s.get('material_id') == material_id]
-            
+
             total_sol = len(solicitudes_mat)
             aprobadas = len([s for s in solicitudes_mat if s.get('estado', '').lower() == 'aprobada'])
             pendientes = len([s for s in solicitudes_mat if s.get('estado', '').lower() == 'pendiente'])
             entregado = sum((s.get('cantidad_solicitada', 0) or 0) for s in solicitudes_mat if s.get('estado', '').lower() == 'aprobada')
-            
+
             stats_dict[material_id] = [total_sol, aprobadas, pendientes, entregado, 0, 0, 0]
-        
+
         return render_template('reportes/materiales.html',
                              materiales=materiales,
                              valor_total_inventario=valor_total_inventario,
@@ -1314,11 +1367,11 @@ def exportar_materiales_excel():
         import pandas as pd
         from io import BytesIO
         from flask import send_file
-        
+
         # Obtener y filtrar materiales
         todos_materiales = MaterialModel.obtener_todos() or []
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
-        
+
         # Crear DataFrame solo con materiales filtrados
         data = []
         for mat in materiales:
@@ -1332,18 +1385,17 @@ def exportar_materiales_excel():
                 'Creado por': mat.get('usuario_creador', ''),
                 'Fecha Creación': mat.get('fecha_creacion', '')
             })
-        
+
         df = pd.DataFrame(data)
-        
+
         # Crear archivo Excel en memoria
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Materiales', index=False)
-            
+
             # Formatear columnas
-            workbook = writer.book
             worksheet = writer.sheets['Materiales']
-            
+
             # Ajustar ancho de columnas
             for column in worksheet.columns:
                 max_length = 0
@@ -1356,20 +1408,20 @@ def exportar_materiales_excel():
                         pass
                 adjusted_width = (max_length + 2)
                 worksheet.column_dimensions[column_letter].width = adjusted_width
-        
+
         output.seek(0)
-        
+
         # Enviar archivo
         fecha_actual = pd.Timestamp.now().strftime('%Y-%m-%d')
         filename = f'reporte_materiales_{fecha_actual}.xlsx'
-        
+
         return send_file(
             output,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name=filename
         )
-        
+
     except Exception as e:
         print(f"❌ Error exportando materiales a Excel: {e}")
         flash('Error al exportar el reporte de materiales a Excel', 'danger')
@@ -1383,18 +1435,18 @@ def reporte_inventario():
         # Obtener y filtrar materiales
         todos_materiales = MaterialModel.obtener_todos() or []
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
-        
+
         # Filtrar con valores por defecto
         materiales_bajo_stock = [m for m in materiales if (m.get('cantidad', 0) or 0) <= 10]
         materiales_stock_normal = [m for m in materiales if (m.get('cantidad', 0) or 0) > 10]
         materiales_sin_stock = [m for m in materiales if (m.get('cantidad', 0) or 0) == 0]
-        
+
         # Calcular valores con seguridad
         valor_bajo_stock = sum((m.get('valor_total', 0) or 0) for m in materiales_bajo_stock)
         valor_stock_normal = sum((m.get('valor_total', 0) or 0) for m in materiales_stock_normal)
         valor_total = sum((m.get('valor_total', 0) or 0) for m in materiales)
         cantidad_total = sum((m.get('cantidad', 0) or 0) for m in materiales)
-        
+
         return render_template('reportes/inventario.html',
                             materiales=materiales,
                             materiales_bajo_stock=materiales_bajo_stock,
@@ -1425,11 +1477,11 @@ def exportar_inventario_excel():
         import pandas as pd
         from io import BytesIO
         from flask import send_file
-        
+
         # Obtener y filtrar materiales
         todos_materiales = MaterialModel.obtener_todos() or []
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
-        
+
         # Crear DataFrame para inventario
         data = []
         for mat in materiales:
@@ -1438,7 +1490,7 @@ def exportar_inventario_excel():
                 estado_stock = "Sin Stock"
             elif mat.get('cantidad', 0) <= 10:
                 estado_stock = "Bajo Stock"
-                
+
             data.append({
                 'ID': mat.get('id', ''),
                 'Nombre': mat.get('nombre', ''),
@@ -1449,18 +1501,17 @@ def exportar_inventario_excel():
                 'Oficina': mat.get('oficina_nombre', ''),
                 'Última Actualización': mat.get('fecha_actualizacion', '')
             })
-        
+
         df = pd.DataFrame(data)
-        
+
         # Crear archivo Excel en memoria
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Inventario', index=False)
-            
+
             # Formatear columnas
-            workbook = writer.book
             worksheet = writer.sheets['Inventario']
-            
+
             # Ajustar ancho de columnas
             for column in worksheet.columns:
                 max_length = 0
@@ -1473,20 +1524,20 @@ def exportar_inventario_excel():
                         pass
                 adjusted_width = (max_length + 2)
                 worksheet.column_dimensions[column_letter].width = adjusted_width
-        
+
         output.seek(0)
-        
+
         # Enviar archivo
         fecha_actual = pd.Timestamp.now().strftime('%Y-%m-%d')
         filename = f'reporte_inventario_{fecha_actual}.xlsx'
-        
+
         return send_file(
             output,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name=filename
         )
-        
+
     except Exception as e:
         print(f"❌ Error exportando inventario a Excel: {e}")
         flash('Error al exportar el reporte de inventario a Excel', 'danger')
@@ -1501,44 +1552,44 @@ def reporte_solicitudes():
         todas_solicitudes = SolicitudModel.obtener_todas() or []
         todos_materiales = MaterialModel.obtener_todos() or []
         todas_oficinas = OficinaModel.obtener_todas() or []
-        
+
         solicitudes = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
         oficinas_filtradas = filtrar_por_oficina_usuario(todas_oficinas)
-        
+
         # Crear diccionario de materiales para imágenes
         materiales_dict = {mat['id']: mat for mat in materiales}
-        
+
         # Obtener oficinas únicas para el filtro (solo las permitidas)
         oficinas_unique = list(set([oficina['nombre'] for oficina in oficinas_filtradas if oficina.get('nombre')]))
-        
+
         # Obtener filtros de la URL
         filtro_estado = request.args.get('estado', 'todos')
         filtro_oficina = request.args.get('oficina', 'todas')
         filtro_material = request.args.get('material', '').lower()
         filtro_solicitante = request.args.get('solicitante', '').lower()
-        
+
         # Aplicar filtros a las solicitudes
         solicitudes_filtradas = solicitudes.copy()
-        
+
         if filtro_estado != 'todos':
             solicitudes_filtradas = [s for s in solicitudes_filtradas if s.get('estado', '').lower() == filtro_estado.lower()]
-        
+
         if filtro_oficina != 'todas':
             solicitudes_filtradas = [s for s in solicitudes_filtradas if s.get('oficina_nombre', '') == filtro_oficina]
-        
+
         if filtro_material:
             solicitudes_filtradas = [s for s in solicitudes_filtradas if filtro_material in s.get('material_nombre', '').lower()]
-        
+
         if filtro_solicitante:
             solicitudes_filtradas = [s for s in solicitudes_filtradas if filtro_solicitante in s.get('usuario_solicitante', '').lower()]
-        
+
         # Calcular estadísticas con las solicitudes FILTRADAS
         total_solicitudes = len(solicitudes_filtradas)
         solicitudes_pendientes = len([s for s in solicitudes_filtradas if s.get('estado', '').lower() == 'pendiente'])
         solicitudes_aprobadas = len([s for s in solicitudes_filtradas if s.get('estado', '').lower() == 'aprobada'])
         solicitudes_rechazadas = len([s for s in solicitudes_filtradas if s.get('estado', '').lower() == 'rechazada'])
-        
+
         return render_template('reportes/solicitudes.html',
                              solicitudes=solicitudes_filtradas,
                              materiales_dict=materiales_dict,
@@ -1571,11 +1622,11 @@ def exportar_solicitudes_excel():
         import pandas as pd
         from io import BytesIO
         from flask import send_file
-        
+
         # Obtener y filtrar solicitudes
         todas_solicitudes = SolicitudModel.obtener_todas() or []
         solicitudes = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
-        
+
         # Crear DataFrame solo con solicitudes filtradas
         data = []
         for sol in solicitudes:
@@ -1594,18 +1645,17 @@ def exportar_solicitudes_excel():
                 'Aprobador': sol.get('usuario_aprobador', ''),
                 'Observaciones': sol.get('observacion', '')
             })
-        
+
         df = pd.DataFrame(data)
-        
+
         # Crear archivo Excel en memoria
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Solicitudes', index=False)
-            
+
             # Formatear columnas
-            workbook = writer.book
             worksheet = writer.sheets['Solicitudes']
-            
+
             # Ajustar ancho de columnas
             for column in worksheet.columns:
                 max_length = 0
@@ -1618,20 +1668,20 @@ def exportar_solicitudes_excel():
                         pass
                 adjusted_width = (max_length + 2)
                 worksheet.column_dimensions[column_letter].width = adjusted_width
-        
+
         output.seek(0)
-        
+
         # Enviar archivo
         fecha_actual = pd.Timestamp.now().strftime('%Y-%m-%d')
         filename = f'reporte_solicitudes_{fecha_actual}.xlsx'
-        
+
         return send_file(
             output,
             mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
             as_attachment=True,
             download_name=filename
         )
-        
+
     except Exception as e:
         print(f"❌ Error exportando a Excel: {e}")
         flash('Error al exportar el reporte a Excel', 'danger')
@@ -1646,21 +1696,19 @@ def reporte_material_detalle(id):
         if not material:
             flash('Material no encontrado', 'danger')
             return redirect('/reportes/materiales')
-        
+
         # Verificar acceso al material
         if not verificar_acceso_oficina(material.get('oficina_id')):
             flash('No tiene permisos para acceder a este material', 'danger')
             return redirect('/reportes/materiales')
-        
+
         # Obtener el nombre de la oficina
         oficina = OficinaModel.obtener_por_id(material.get('oficina_id', 1))
         oficina_nombre = oficina.get('nombre', 'Sede Principal') if oficina else 'Sede Principal'
-        
+
         # Agregar nombre de oficina al material
         material['oficina_nombre'] = oficina_nombre
-        
-        # Obtener todas las solicitudes para este material (filtradas por oficina)
-        
+
         # Obtener todas las solicitudes
         todas_solicitudes = SolicitudModel.obtener_todas() or []
 
@@ -1671,10 +1719,10 @@ def reporte_material_detalle(id):
             solicitudes = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
         solicitudes_filtradas = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
         solicitudes_material = [s for s in solicitudes_filtradas if s.get('material_id') == id]
-        
+
         total_solicitudes = len(solicitudes_material)
         solicitudes_aprobadas = len([s for s in solicitudes_material if s.get('estado', '').lower() == 'aprobada'])
-        
+
         return render_template('reportes/material_detalle.html',
                          material=material,
                          solicitudes=solicitudes_material,
@@ -1727,7 +1775,7 @@ def api_oficina_materiales(oficina_id):
         # Verificar acceso a la oficina
         if not verificar_acceso_oficina(oficina_id):
             return jsonify({'error': 'No tiene permisos para acceder a esta oficina'}), 403
-            
+
         materiales = MaterialModel.obtener_todos() or []
         materiales_oficina = [mat for mat in materiales if mat.get('oficina_id') == oficina_id]
         return jsonify(materiales_oficina)
@@ -1759,10 +1807,13 @@ if __name__ == '__main__':
     print(f"📁 Directorio de trabajo: {os.getcwd()}")
     print(f"📁 Directorio de templates: {os.path.abspath('templates')}")
     print(f"📁 Directorio de uploads: {os.path.abspath(UPLOAD_FOLDER)}")
-    
+
     # Verificar que existe el directorio de uploads
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
         print(f"✅ Creado directorio de uploads: {UPLOAD_FOLDER}")
-    
+
+    # Inicializar Sede Principal
+    inicializar_oficina_principal()
+
     app.run(debug=True, host='0.0.0.0', port=5000)
