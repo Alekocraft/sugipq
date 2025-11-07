@@ -7,7 +7,7 @@
         <h1 class="fw-bold" style="color: #A73493;">
             <i class="fas fa-plus-circle"></i> Crear Material para Préstamos
         </h1>
-        <a href="{{ url_for('prestamos.listar') }}" class="btn btn-secondary">
+        <a href="/prestamos" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Volver a Préstamos
         </a>
     </div>
@@ -25,7 +25,7 @@
 
     <div class="card border-0 shadow-sm">
         <div class="card-body">
-            <form method="post" action="{{ url_for('prestamos.crear_elemento_publicitario_post') }}" enctype="multipart/form-data">
+            <form method="post" action="/prestamos/elementos/crear" enctype="multipart/form-data">
                 <div class="row g-3">
                     <div class="col-md-6">
                         <label class="form-label">Nombre del Elemento*</label>
@@ -71,7 +71,7 @@
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-save"></i> Crear Material
                     </button>
-                    <a href="{{ url_for('prestamos.listar') }}" class="btn btn-outline-secondary">
+                    <a href="/prestamos" class="btn btn-outline-secondary">
                         <i class="fas fa-arrow-left"></i> Volver
                     </a>
                 </div>

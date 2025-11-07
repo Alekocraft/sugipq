@@ -12,22 +12,22 @@
             <p class="text-muted">Control y seguimiento de préstamos de material</p>
         </div>
         <div class="d-flex gap-2">
-            <a href="{{ url_for('prestamos.crear_prestamo_get') }}" class="btn btn-primary">
+            <a href="/prestamos/crear" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Nuevo Préstamo
             </a>
             <a class="btn btn-outline-secondary"
-               href="{{ url_for('prestamos.exportar', fmt='xlsx', estado=filtro_estado) }}">
+               href="/prestamos/exportar?fmt=xlsx&estado={{filtro_estado}}">
                 <i class="fas fa-file-excel"></i> Exportar Excel
             </a>
             <a class="btn btn-outline-secondary"
-               href="{{ url_for('prestamos.exportar', fmt='pdf', estado=filtro_estado) }}">
+               href="/prestamos/exportar?fmt=pdf&estado={{filtro_estado}}">
                 <i class="fas fa-file-pdf"></i> Exportar PDF
             </a>
         </div>
     </div>
 
     <!-- Filtros -->
-    <form class="row g-2 mb-3" method="get" action="{{ url_for('prestamos.listar') }}">
+    <form class="row g-2 mb-3" method="get" action="/prestamos">
         <div class="col-md-3">
             <label class="form-label">Estado</label>
             <select class="form-select" name="estado" onchange="this.form.submit()">

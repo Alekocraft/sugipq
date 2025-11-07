@@ -194,8 +194,7 @@
                         <h6 class="fw-semibold mb-3" style="color: #0098B1;"><i class="fas fa-bolt"></i> Acciones Rápidas</h6>
                         <div class="d-flex flex-wrap gap-2">
                             <a href="/inventario-corporativo/crear" class="btn btn-primary"><i class="fas fa-plus"></i> Nuevo Producto</a>
-                            <a href="/inventario-corporativo" class="btn btn-success"><i class="fas fa-list"></i> Ver Inventario</a>
-                            <a href="/inventario-corporativo/reportes" class="btn btn-info"><i class="fas fa-chart-bar"></i> Reportes</a>
+                            <a href="/inventario-corporativo" class="btn btn-success"><i class="fas fa-list"></i> Ver Inventario</a>                           
                             {% if session.rol in ['administrador', 'lider_inventario'] %}
                             {% endif %}
                         </div>
@@ -209,8 +208,6 @@
         </div>
     </div>
 </div>
-
-<!-- Modal: Préstamos -->
 
 <!-- Modal: Préstamos -->
 <div class="modal fade" id="modalPrestamos" tabindex="-1" aria-labelledby="modalPrestamosLabel" aria-hidden="true">
