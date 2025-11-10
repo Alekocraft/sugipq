@@ -11,10 +11,11 @@
             <p class="text-muted">Gestión de equipos y productos corporativos - {{ subtitulo }}</p>
         </div>
         <div class="d-flex gap-2">
-            <a href="/inventario-corporativo/reportes" class="btn btn-outline-secondary">
+            <!-- Botón temporalmente deshabilitado -->
+            <button class="btn btn-outline-secondary" disabled title="Próximamente">
                 <i class="fas fa-chart-bar"></i> Reportes
-            </a>
-            <a href="/inventario-corporativo/crear" class="btn btn-primary">
+            </button>
+            <a href="{{ url_for('inventario_corporativo.crear_inventario_corporativo') }}" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Nuevo Producto
             </a>
         </div>
@@ -68,7 +69,7 @@
                     {% if filtro_oficina %}<span class="badge bg-primary">{{ filtro_oficina }}</span>{% endif %}
                     {% if filtro_categoria %}<span class="badge bg-secondary">{{ filtro_categoria }}</span>{% endif %}
                     {% if filtro_stock %}<span class="badge bg-info">{{ filtro_stock|title }}</span>{% endif %}
-                    <a href="{{ url_for('listar_inventario_corporativo_filtrado', tipo=tipo) }}" class="btn btn-sm btn-outline-danger ms-2">
+                    <a href="{{ url_for('inventario_corporativo.listar_inventario_corporativo_filtrado', tipo=tipo) }}" class="btn btn-sm btn-outline-danger ms-2">
                         <i class="fas fa-times"></i> Limpiar
                     </a>
                 </small>
@@ -119,7 +120,7 @@
             <span class="text-muted">Mostrando {{ productos|length }} de {{ total_productos }} productos</span>
         </div>
         <div>
-            <a href="{{ url_for('exportar_inventario_corporativo_excel', tipo=tipo) }}?oficina={{ filtro_oficina }}&categoria={{ filtro_categoria }}&stock={{ filtro_stock }}"
+            <a href="{{ url_for('inventario_corporativo.exportar_inventario_corporativo_excel', tipo=tipo) }}?oficina={{ filtro_oficina }}&categoria={{ filtro_categoria }}&stock={{ filtro_stock }}"
                class="btn btn-success">
                 <i class="fas fa-file-excel"></i> Exportar a Excel
             </a>
@@ -164,9 +165,9 @@
                                     </div>
                                     {% endif %}
                                     <div>
-                                        <a href="/inventario-corporativo/{{ producto.id }}" class="fw-semibold text-decoration-none">
+                                        <span class="fw-semibold">
                                             {{ producto.nombre }}
-                                        </a>
+                                        </span>
                                         {% if producto.descripcion %}
                                         <br><small class="text-muted">{{ producto.descripcion[:60] }}{% if producto.descripcion|length > 60 %}...{% endif %}</small>
                                         {% endif %}
@@ -196,26 +197,25 @@
                             </td>
                             <td style="white-space:nowrap;">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <a class="btn btn-outline-primary" href="/inventario-corporativo/{{ producto.id }}" title="Ver detalles">
+                                    <!-- Botones temporalmente deshabilitados -->
+                                    <button class="btn btn-outline-primary" disabled title="Próximamente">
                                         <i class="fas fa-eye"></i>
-                                    </a>
+                                    </button>
 
                                     {% if rol in ['administrador','lider_inventario'] %}
-                                    <a class="btn btn-outline-warning" href="/inventario-corporativo/editar/{{ producto.id }}" title="Editar">
+                                    <button class="btn btn-outline-warning" disabled title="Próximamente">
                                         <i class="fas fa-edit"></i>
-                                    </a>
+                                    </button>
 
                                     {% if producto.es_asignable %}
-                                    <a class="btn btn-outline-success" href="/inventario-corporativo/asignar/{{ producto.id }}" title="Asignar a oficina">
+                                    <button class="btn btn-outline-success" disabled title="Próximamente">
                                         <i class="fas fa-share-square"></i>
-                                    </a>
+                                    </button>
                                     {% endif %}
 
-                                    <form action="/inventario-corporativo/eliminar/{{ producto.id }}" method="POST" onsubmit="return confirm('¿Eliminar este producto?')" style="display:inline;">
-                                        <button type="submit" class="btn btn-outline-danger" title="Eliminar">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </form>
+                                    <button class="btn btn-outline-danger" disabled title="Próximamente">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                     {% endif %}
                                 </div>
                             </td>

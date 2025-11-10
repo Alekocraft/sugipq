@@ -7,11 +7,34 @@
 
 {% block content %}
 <div class="container-fluid">
-    <!-- Header simple para debug -->
+    <!-- Header con botón de exportación -->
     <div class="row mb-4 debug-bg">
-        <div class="col-12">
+        <div class="col-md-8">
             <h1 class="text-primary">Inventario Corporativo</h1>
             <p>Productos cargados: {{ productos|length }}</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="btn-group">
+                <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fas fa-file-excel"></i> Exportar
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('inventario_corporativo.exportar_inventario_corporativo_excel', tipo='todo') }}">
+                        <i class="fas fa-table"></i> Todo el inventario
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('inventario_corporativo.exportar_inventario_corporativo_excel', tipo='asignables') }}">
+                        <i class="fas fa-laptop"></i> Solo asignables
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('inventario_corporativo.exportar_inventario_corporativo_excel', tipo='bajo_stock') }}">
+                        <i class="fas fa-exclamation-triangle"></i> Stock bajo
+                    </a></li>
+                </ul>
+            </div>
+            {% if rol in ['administrador','lider_inventario'] %}
+            <a href="/inventario-corporativo/nuevo" class="btn btn-primary ms-2">
+                <i class="fas fa-plus"></i> Nuevo Producto
+            </a>
+            {% endif %}
         </div>
     </div>
 

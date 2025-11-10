@@ -11,7 +11,7 @@
     <OutputPath>.</OutputPath>
     <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
-    <InterpreterId>MSBuild|env1|$(MSBuildProjectFullPath)</InterpreterId>
+    <InterpreterId>MSBuild|env11|$(MSBuildProjectFullPath)</InterpreterId>
     <SuppressEnvironmentCreationPrompt>True</SuppressEnvironmentCreationPrompt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
@@ -53,11 +53,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="app.py" />
+    <Compile Include="blueprints\api.py" />
+    <Compile Include="blueprints\aprobacion.py" />
     <Compile Include="blueprints\aprobadores.py" />
+    <Compile Include="blueprints\inventario_corporativo.py" />
     <Compile Include="blueprints\materiales.py" />
     <Compile Include="blueprints\oficinas.py" />
     <Compile Include="blueprints\reportes.py" />
     <Compile Include="blueprints\solicitudes.py" />
+    <Compile Include="config\config.py" />
+    <Compile Include="config\__init__.py" />
     <Compile Include="database.py" />
     <Compile Include="models\generar_hash.py" />
     <Compile Include="models\materiales_model.py" />
@@ -73,10 +78,12 @@
     <Compile Include="templates\reportes\__init__.py" />
     <Compile Include="templates\solicitudes\__init__.py" />
     <Compile Include="blueprints\auth.py" />
+    <Compile Include="utils\helpers.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="models\" />
     <Folder Include="blueprints\" />
+    <Folder Include="config\" />
     <Folder Include="utils\" />
     <Folder Include="static\css\" />
     <Folder Include="static\images\" />
@@ -96,6 +103,15 @@
   <ItemGroup>
     <Interpreter Include=".venv\env1\">
       <Id>env1</Id>
+      <Version>3.9</Version>
+      <Description>env1 (Python 3.9 (64-bit))</Description>
+      <InterpreterPath>Scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <PathEnvironmentVariable>PYTHONPATH</PathEnvironmentVariable>
+      <Architecture>X64</Architecture>
+    </Interpreter>
+    <Interpreter Include="env1\">
+      <Id>env11</Id>
       <Version>3.9</Version>
       <Description>env1 (Python 3.9 (64-bit))</Description>
       <InterpreterPath>Scripts\python.exe</InterpreterPath>
