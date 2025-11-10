@@ -1,5 +1,4 @@
-/* ======== LOGIN STYLES (Diseño visual actualizado) ======== */
-
+/* ======== VARIABLES Y CONFIGURACIÓN GLOBAL ======== */
 :root {
     --morado: #A73493;
     --azul: #0098B1;
@@ -18,7 +17,7 @@
     --transicion-media: 0.3s;
 }
 
-/* ======== Fondo ======== */
+/* ======== FONDO Y ESTRUCTURA PRINCIPAL ======== */
 .login-body {
     background: linear-gradient(135deg, var(--azul) 0%, var(--morado) 100%);
     min-height: 100vh;
@@ -41,7 +40,7 @@
     z-index: 0;
 }
 
-/* ======== Contenedor ======== */
+/* ======== CONTENEDOR Y ANIMACIONES ======== */
 .login-container {
     position: relative;
     z-index: 1;
@@ -58,14 +57,13 @@
         opacity: 0;
         transform: translateY(30px);
     }
-
     to {
         opacity: 1;
         transform: translateY(0);
     }
 }
 
-/* ======== Header ======== */
+/* ======== HEADER ======== */
 .login-header {
     color: var(--blanco);
     text-align: center;
@@ -90,7 +88,7 @@
     font-weight: 400;
 }
 
-/* ======== Card del Login ======== */
+/* ======== CARD DEL LOGIN ======== */
 .login-card {
     background: var(--blanco);
     border: none;
@@ -100,21 +98,21 @@
     transition: all 0.3s ease;
 }
 
-    .login-card:hover {
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-    }
+.login-card:hover {
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+}
 
-    .login-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 4px;
-        background: linear-gradient(90deg, var(--morado), var(--azul));
-    }
+.login-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--morado), var(--azul));
+}
 
-/* ======== Formulario ======== */
+/* ======== FORMULARIO Y CAMPOS ======== */
 .login-form .form-label {
     font-weight: 600;
     color: var(--texto);
@@ -122,27 +120,30 @@
     font-size: 0.9rem;
 }
 
+/* ======== GRUPOS DE INPUT UNIFICADOS ======== */
+.input-group-text {
+    background-color: var(--fondo);
+    border: 2px solid var(--gris);
+    border-right: none;
+    border-radius: var(--radio-borde) 0 0 var(--radio-borde);
+    transition: all var(--transicion-media);
+    color: var(--texto);
+}
+
 .login-input {
     border: 2px solid var(--gris);
-    border-radius: var(--radio-borde);
+    border-left: none;
+    border-radius: 0 var(--radio-borde) var(--radio-borde) 0;
     padding: var(--espacio-md);
     font-size: 0.95rem;
     background-color: var(--fondo);
     transition: all var(--transicion-media);
 }
 
-    .login-input:focus {
-        border-color: var(--morado);
-        box-shadow: 0 0 0 0.25rem rgba(167, 52, 147, 0.25);
-        background-color: var(--blanco);
-    }
-
-.input-group-text {
-    background-color: var(--fondo);
-    border: 2px solid var(--gris);
-    border-left: none;
-    transition: all var(--transicion-media);
-    color: var(--texto);
+.login-input:focus {
+    border-color: var(--morado);
+    box-shadow: 0 0 0 0.25rem rgba(167, 52, 147, 0.25);
+    background-color: var(--blanco);
 }
 
 .login-input:focus + .input-group-text {
@@ -151,17 +152,29 @@
     background-color: var(--blanco);
 }
 
-/* ======== Icono mostrar contraseña ======== */
+/* ======== BOTÓN MOSTRAR CONTRASEÑA UNIFICADO ======== */
 .toggle-password {
+    border: 2px solid var(--gris);
+    border-left: none;
+    background-color: var(--fondo);
+    color: var(--texto);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transicion-media);
+    border-radius: 0 var(--radio-borde) var(--radio-borde) 0;
     cursor: pointer;
-    transition: color var(--transicion-rapida);
+    padding: 0 var(--espacio-sm);
+    font-size: 1.2rem;
 }
 
-    .toggle-password:hover {
-        color: var(--morado) !important;
-    }
+.toggle-password:hover {
+    color: var(--morado);
+    background-color: var(--blanco);
+    border-color: var(--morado);
+}
 
-/* ======== Botón principal ======== */
+/* ======== BOTÓN PRINCIPAL ======== */
 .login-btn {
     background: linear-gradient(90deg, var(--morado), var(--azul));
     color: var(--blanco);
@@ -176,27 +189,27 @@
     box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
 
-    .login-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 14px rgba(0,0,0,0.25);
-    }
+.login-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.25);
+}
 
-    .login-btn::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
-        transition: left 0.5s;
-    }
+.login-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transition: left 0.5s;
+}
 
-    .login-btn:hover::before {
-        left: 100%;
-    }
+.login-btn:hover::before {
+    left: 100%;
+}
 
-/* ======== Footer ======== */
+/* ======== FOOTER ======== */
 .login-footer {
     color: var(--blanco);
     opacity: 0.85;
@@ -204,11 +217,11 @@
     font-size: 0.85rem;
 }
 
-    .login-footer i {
-        color: var(--blanco);
-    }
+.login-footer i {
+    color: var(--blanco);
+}
 
-/* ======== Alertas ======== */
+/* ======== ALERTAS ======== */
 .login-container .custom-alert {
     margin-bottom: var(--espacio-lg);
     animation: shake 0.5s ease-in-out;
@@ -219,37 +232,15 @@
     0%, 100% {
         transform: translateX(0);
     }
-
     25% {
         transform: translateX(-5px);
     }
-
     75% {
         transform: translateX(5px);
     }
 }
 
-/* ======== Responsive ======== */
-@media (max-width: 576px) {
-    .login-container {
-        max-width: 100%;
-        padding: 0 var(--espacio-md);
-    }
-
-    .login-card .card-body {
-        padding: var(--espacio-lg) !important;
-    }
-
-    .login-logo {
-        height: 60px;
-    }
-
-    .login-title {
-        font-size: 1.5rem;
-    }
-}
-
-/* ======== Loader (para feedback visual, no lógica) ======== */
+/* ======== LOADER ======== */
 .loading::after {
     content: '';
     position: absolute;
@@ -267,5 +258,25 @@
 @keyframes spin {
     to {
         transform: rotate(360deg);
+    }
+}
+
+/* ======== RESPONSIVE ======== */
+@media (max-width: 576px) {
+    .login-container {
+        max-width: 100%;
+        padding: 0 var(--espacio-md);
+    }
+
+    .login-card .card-body {
+        padding: var(--espacio-lg) !important;
+    }
+
+    .login-logo {
+        height: 60px;
+    }
+
+    .login-title {
+        font-size: 1.5rem;
     }
 }
