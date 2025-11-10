@@ -51,7 +51,8 @@
             <!-- Tarjeta principal -->
             <div class="card login-card">
                 <div class="card-body p-4">
-                    <form method="POST" action="{{ url_for('login') if url_for else '#' }}" class="login-form">
+                    <!-- ✅ CAMBIO CRÍTICO: Simplificar el action del formulario -->
+                    <form method="POST" action="" class="login-form">
                         <!-- Campo Usuario -->
                         <div class="form-group mb-3">
                             <label for="usuario" class="form-label">

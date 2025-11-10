@@ -53,6 +53,11 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="app.py" />
+    <Compile Include="blueprints\aprobadores.py" />
+    <Compile Include="blueprints\materiales.py" />
+    <Compile Include="blueprints\oficinas.py" />
+    <Compile Include="blueprints\reportes.py" />
+    <Compile Include="blueprints\solicitudes.py" />
     <Compile Include="database.py" />
     <Compile Include="models\generar_hash.py" />
     <Compile Include="models\materiales_model.py" />
@@ -67,9 +72,12 @@
     <Compile Include="templates\materials\__init__.py" />
     <Compile Include="templates\reportes\__init__.py" />
     <Compile Include="templates\solicitudes\__init__.py" />
+    <Compile Include="blueprints\auth.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="models\" />
+    <Folder Include="blueprints\" />
+    <Folder Include="utils\" />
     <Folder Include="static\css\" />
     <Folder Include="static\images\" />
     <Folder Include="static\js\" />
