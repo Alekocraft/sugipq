@@ -15,14 +15,13 @@
             <a href="/prestamos/crear" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Nuevo Préstamo
             </a>
-            <a class="btn btn-outline-secondary"
-               href="/prestamos/exportar?fmt=xlsx&estado={{filtro_estado}}">
+            <!-- BOTONES CORREGIDOS - EXPORTACIÓN FRONTEND -->
+            <button class="btn btn-success" onclick="exportarExcelPrestamos()">
                 <i class="fas fa-file-excel"></i> Exportar Excel
-            </a>
-            <a class="btn btn-outline-secondary"
-               href="/prestamos/exportar?fmt=pdf&estado={{filtro_estado}}">
+            </button>
+            <button class="btn btn-danger" onclick="exportarPDFPrestamos()">
                 <i class="fas fa-file-pdf"></i> Exportar PDF
-            </a>
+            </button>
         </div>
     </div>
 
@@ -48,7 +47,7 @@
     <div class="card border-0 shadow-sm">
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table class="table table-hover align-middle" id="tablaPrestamos">
                     <thead class="table-light">
                         <tr>
                             <th>#</th>
@@ -72,7 +71,6 @@
                             <td class="text-end">{{ r.cantidad }}</td>
                             <td class="text-end">{{ "%.2f"|format(r.valor_unitario) }}</td>
                             <td class="text-end">{{ "%.2f"|format(r.subtotal) }}</td>
-                            <!-- Mostrar nombres en lugar de IDs -->
                             <td>{{ r.solicitante_nombre }}</td>
                             <td>{{ r.oficina_nombre }}</td>
                             <td>{{ r.fecha.strftime('%Y-%m-%d %H:%M') if r.fecha }}</td>
@@ -132,6 +130,7 @@
     </div>
 </div>
 
+<!-- Los modales se mantienen igual -->
 <!-- Modal para Aprobar -->
 <div class="modal fade" id="aprobarModal" tabindex="-1" aria-labelledby="aprobarModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -236,8 +235,96 @@
     </div>
 </div>
 
-<!-- Script para manejar los modales -->
+<style>
+    .table th {
+        white-space: nowrap;
+    }
+    
+    .table td {
+        vertical-align: middle;
+    }
+    
+    .btn-sm {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<!-- Incluir las librerías para exportación -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+
 <script>
+    // Función para exportar a Excel
+    function exportarExcelPrestamos() {
+        try {
+            const tabla = document.getElementById('tablaPrestamos');
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.table_to_sheet(tabla);
+            XLSX.utils.book_append_sheet(wb, ws, 'Préstamos');
+            XLSX.writeFile(wb, `Reporte_Préstamos_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+            setTimeout(() => {
+                alert('✅ Exportación a Excel completada exitosamente');
+            }, 1000);
+        } catch (error) {
+            console.error('Error en exportación Excel:', error);
+            alert('❌ Error al exportar a Excel');
+        }
+    }
+
+    // Función para exportar a PDF
+    function exportarPDFPrestamos() {
+        try {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Título del reporte
+            doc.setFontSize(16);
+            doc.text('Reporte de Préstamos - Sistema de Gestión', 14, 15);
+            doc.setFontSize(10);
+            doc.text(`Generado el: ${new Date().toLocaleDateString()}`, 14, 22);
+            doc.text(`Total de préstamos: {{ prestamos|length }}`, 14, 29);
+            doc.text(`Filtro estado: {{ filtro_estado or 'Todos' }}`, 14, 36);
+
+            // Crear tabla en PDF
+            doc.autoTable({
+                html: '#tablaPrestamos',
+                startY: 45,
+                theme: 'grid',
+                headStyles: { fillColor: [111, 66, 193] }, // Color morado
+                styles: { fontSize: 8 },
+                columnStyles: {
+                    0: { cellWidth: 15 },
+                    1: { cellWidth: 35 },
+                    2: { cellWidth: 15 },
+                    3: { cellWidth: 25 },
+                    4: { cellWidth: 25 },
+                    5: { cellWidth: 30 },
+                    6: { cellWidth: 25 },
+                    7: { cellWidth: 30 },
+                    8: { cellWidth: 30 },
+                    9: { cellWidth: 25 },
+                    10: { cellWidth: 30 }
+                }
+            });
+
+            // Guardar PDF
+            doc.save(`Reporte_Préstamos_${new Date().toISOString().split('T')[0]}.pdf`);
+
+            setTimeout(() => {
+                alert('✅ Exportación a PDF completada exitosamente');
+            }, 1000);
+        } catch (error) {
+            console.error('Error en exportación PDF:', error);
+            alert('❌ Error al exportar a PDF');
+        }
+    }
+
+    // Script para manejar los modales (mantenido igual)
     document.addEventListener('DOMContentLoaded', function () {
         // Modal para Aprobar
         const aprobarModal = document.getElementById('aprobarModal');
@@ -275,8 +362,6 @@
             const modalBodyInput = rechazarModal.querySelector('#rechazar_prestamo_id');
             modalBodyInput.value = prestamoId;
             document.getElementById('formRechazar').action = `/prestamos/${prestamoId}/rechazar`;
-
-            // Limpiar el textarea cada vez que se abre el modal
             document.getElementById('observacion').value = '';
         });
 
@@ -288,8 +373,6 @@
             const modalBodyInput = devolucionModal.querySelector('#devolucion_prestamo_id');
             modalBodyInput.value = prestamoId;
             document.getElementById('formDevolucion').action = `/prestamos/${prestamoId}/devolucion`;
-
-            // Limpiar el textarea cada vez que se abre el modal
             document.getElementById('observacion_devolucion').value = '';
         });
     });

@@ -54,7 +54,11 @@
                         <div class="col-md-12 mt-2">
                             <button type="submit" class="btn btn-primary me-2">🔍 Aplicar Filtros</button>
                             <a href="/reportes/solicitudes" class="btn btn-secondary">🔄 Limpiar Filtros</a>
-                            <a href="/reportes/solicitudes/exportar/excel?estado={{ filtro_estado }}&oficina={{ filtro_oficina }}&material={{ request.args.get('material', '') }}&solicitante={{ request.args.get('solicitante', '') }}"
+                            <a href="{{ url_for('reportes.exportar_solicitudes_excel', 
+                                estado=filtro_estado, 
+                                oficina=filtro_oficina, 
+                                material=request.args.get('material', ''), 
+                                solicitante=request.args.get('solicitante', '')) }}"
                                class="btn btn-success">
                                 📊 Exportar a Excel
                             </a>

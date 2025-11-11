@@ -21,17 +21,14 @@ def reportes_index():
         return redirect('/login')
     
     try:
-        # Obtener todos los datos primero
         todas_solicitudes = SolicitudModel.obtener_todas() or []
         todos_materiales = MaterialModel.obtener_todos() or []
         todas_oficinas = OficinaModel.obtener_todas() or []
 
-        # Aplicar filtros por oficina según el rol
         solicitudes = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
         oficinas = filtrar_por_oficina_usuario(todas_oficinas)
 
-        # Calcular estadísticas con datos filtrados
         total_solicitudes = len(solicitudes)
         solicitudes_pendientes = len([s for s in solicitudes if s.get('estado', '').lower() == 'pendiente'])
         solicitudes_aprobadas = len([s for s in solicitudes if s.get('estado', '').lower() == 'aprobada'])
@@ -66,30 +63,24 @@ def reporte_materiales():
         return redirect('/login')
     
     try:
-        # Obtener y filtrar materiales
         todos_materiales = MaterialModel.obtener_todos() or []
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
 
-        # Obtener y filtrar solicitudes para estadísticas
         todas_solicitudes = SolicitudModel.obtener_todas() or []
         solicitudes_filtradas = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
 
-        # Calcular estadísticas con datos filtrados
         valor_total_inventario = sum(m.get('valor_total', 0) or 0 for m in materiales)
         total_solicitudes = len(solicitudes_filtradas)
         total_entregado = sum((m.get('cantidad', 0) or 0) for m in materiales)
 
-        # Crear stats_dict con datos filtrados
         stats_dict = {}
         for material in materiales:
             material_id = material['id']
             solicitudes_mat = [s for s in solicitudes_filtradas if s.get('material_id') == material_id]
-
             total_sol = len(solicitudes_mat)
             aprobadas = len([s for s in solicitudes_mat if s.get('estado', '').lower() == 'aprobada'])
             pendientes = len([s for s in solicitudes_mat if s.get('estado', '').lower() == 'pendiente'])
             entregado = sum((s.get('cantidad_solicitada', 0) or 0) for s in solicitudes_mat if s.get('estado', '').lower() == 'aprobada')
-
             stats_dict[material_id] = [total_sol, aprobadas, pendientes, entregado, 0, 0, 0]
 
         return render_template('reportes/materiales.html',
@@ -114,11 +105,9 @@ def exportar_materiales_excel():
         return redirect('/login')
     
     try:
-        # Obtener y filtrar materiales
         todos_materiales = MaterialModel.obtener_todos() or []
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
 
-        # Crear DataFrame solo con materiales filtrados
         data = []
         for mat in materiales:
             data.append({
@@ -133,16 +122,10 @@ def exportar_materiales_excel():
             })
 
         df = pd.DataFrame(data)
-
-        # Crear archivo Excel en memoria
         output = BytesIO()
         with pd.ExcelWriter(output, engine='openpyxl') as writer:
             df.to_excel(writer, sheet_name='Materiales', index=False)
-
-            # Formatear columnas
             worksheet = writer.sheets['Materiales']
-
-            # Ajustar ancho de columnas
             for column in worksheet.columns:
                 max_length = 0
                 column_letter = column[0].column_letter
@@ -152,22 +135,16 @@ def exportar_materiales_excel():
                             max_length = len(str(cell.value))
                     except:
                         pass
-                adjusted_width = (max_length + 2)
-                worksheet.column_dimensions[column_letter].width = adjusted_width
-
+                worksheet.column_dimensions[column_letter].width = (max_length + 2)
         output.seek(0)
 
-        # Enviar archivo
         fecha_actual = pd.Timestamp.now().strftime('%Y-%m-%d')
         filename = f'reporte_materiales_{fecha_actual}.xlsx'
 
-        return send_file(
-            output,
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            as_attachment=True,
-            download_name=filename
-        )
-
+        return send_file(output,
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         as_attachment=True,
+                         download_name=filename)
     except Exception as e:
         print(f"❌ Error exportando materiales a Excel: {e}")
         flash('Error al exportar el reporte de materiales a Excel', 'danger')
@@ -179,16 +156,13 @@ def reporte_inventario():
         return redirect('/login')
     
     try:
-        # Obtener y filtrar materiales
         todos_materiales = MaterialModel.obtener_todos() or []
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
 
-        # Filtrar con valores por defecto
         materiales_bajo_stock = [m for m in materiales if (m.get('cantidad', 0) or 0) <= 10]
         materiales_stock_normal = [m for m in materiales if (m.get('cantidad', 0) or 0) > 10]
         materiales_sin_stock = [m for m in materiales if (m.get('cantidad', 0) or 0) == 0]
 
-        # Calcular valores con seguridad
         valor_bajo_stock = sum((m.get('valor_total', 0) or 0) for m in materiales_bajo_stock)
         valor_stock_normal = sum((m.get('valor_total', 0) or 0) for m in materiales_stock_normal)
         valor_total = sum((m.get('valor_total', 0) or 0) for m in materiales)
@@ -222,7 +196,6 @@ def reporte_solicitudes():
         return redirect('/login')
     
     try:
-        # Obtener y filtrar datos
         todas_solicitudes = SolicitudModel.obtener_todas() or []
         todos_materiales = MaterialModel.obtener_todos() or []
         todas_oficinas = OficinaModel.obtener_todas() or []
@@ -230,35 +203,26 @@ def reporte_solicitudes():
         solicitudes = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
         materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
         oficinas_filtradas = filtrar_por_oficina_usuario(todas_oficinas)
-
-        # Crear diccionario de materiales para imágenes
         materiales_dict = {mat['id']: mat for mat in materiales}
 
-        # Obtener oficinas únicas para el filtro (solo las permitidas)
         oficinas_unique = list(set([oficina['nombre'] for oficina in oficinas_filtradas if oficina.get('nombre')]))
 
-        # Obtener filtros de la URL
         filtro_estado = request.args.get('estado', 'todos')
         filtro_oficina = request.args.get('oficina', 'todas')
         filtro_material = request.args.get('material', '').lower()
         filtro_solicitante = request.args.get('solicitante', '').lower()
 
-        # Aplicar filtros a las solicitudes
         solicitudes_filtradas = solicitudes.copy()
 
         if filtro_estado != 'todos':
             solicitudes_filtradas = [s for s in solicitudes_filtradas if s.get('estado', '').lower() == filtro_estado.lower()]
-
         if filtro_oficina != 'todas':
             solicitudes_filtradas = [s for s in solicitudes_filtradas if s.get('oficina_nombre', '') == filtro_oficina]
-
         if filtro_material:
             solicitudes_filtradas = [s for s in solicitudes_filtradas if filtro_material in s.get('material_nombre', '').lower()]
-
         if filtro_solicitante:
             solicitudes_filtradas = [s for s in solicitudes_filtradas if filtro_solicitante in s.get('usuario_solicitante', '').lower()]
 
-        # Calcular estadísticas con las solicitudes FILTRADAS
         total_solicitudes = len(solicitudes_filtradas)
         solicitudes_pendientes = len([s for s in solicitudes_filtradas if s.get('estado', '').lower() == 'pendiente'])
         solicitudes_aprobadas = len([s for s in solicitudes_filtradas if s.get('estado', '').lower() == 'aprobada'])
@@ -299,26 +263,20 @@ def reporte_material_detalle(id):
             flash('Material no encontrado', 'danger')
             return redirect(url_for('reportes.reporte_materiales'))
 
-        # Verificar acceso al material
         if not verificar_acceso_oficina(material.get('oficina_id')):
             flash('No tiene permisos para acceder a este material', 'danger')
             return redirect(url_for('reportes.reporte_materiales'))
 
-        # Obtener el nombre de la oficina
         oficina = OficinaModel.obtener_por_id(material.get('oficina_id', 1))
         oficina_nombre = oficina.get('nombre', 'Sede Principal') if oficina else 'Sede Principal'
-
-        # Agregar nombre de oficina al material
         material['oficina_nombre'] = oficina_nombre
 
-        # Obtener todas las solicitudes
         todas_solicitudes = SolicitudModel.obtener_todas() or []
-
-        # ✅ Solo filtrar si NO es administrador ni lider_inventario
         if session.get('rol') in ['administrador', 'lider_inventario']:
             solicitudes = todas_solicitudes
         else:
             solicitudes = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
+
         solicitudes_filtradas = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
         solicitudes_material = [s for s in solicitudes_filtradas if s.get('material_id') == id]
 
@@ -334,3 +292,147 @@ def reporte_material_detalle(id):
         print(f"❌ Error cargando detalle de material: {e}")
         flash('Error al cargar el detalle del material', 'danger')
         return redirect(url_for('reportes.reporte_materiales'))
+
+
+# 🔽🔽 NUEVAS FUNCIONES AGREGADAS 🔽🔽
+
+@reportes_bp.route('/solicitudes/exportar/excel')
+def exportar_solicitudes_excel():
+    if not _require_login():
+        return redirect('/login')
+    
+    try:
+        filtro_estado = request.args.get('estado', 'todos')
+        filtro_oficina = request.args.get('oficina', 'todas')
+        filtro_material = request.args.get('material', '').lower()
+        filtro_solicitante = request.args.get('solicitante', '').lower()
+
+        todas_solicitudes = SolicitudModel.obtener_todas() or []
+        todos_materiales = MaterialModel.obtener_todos() or []
+        todas_oficinas = OficinaModel.obtener_todas() or []
+
+        solicitudes = filtrar_por_oficina_usuario(todas_solicitudes, 'oficina_id')
+        materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
+        oficinas_filtradas = filtrar_por_oficina_usuario(todas_oficinas)
+        materiales_dict = {mat['id']: mat for mat in materiales}
+
+        solicitudes_filtradas = solicitudes.copy()
+
+        if filtro_estado != 'todos':
+            solicitudes_filtradas = [s for s in solicitudes_filtradas if s.get('estado', '').lower() == filtro_estado.lower()]
+        if filtro_oficina != 'todas':
+            solicitudes_filtradas = [s for s in solicitudes_filtradas if s.get('oficina_nombre', '') == filtro_oficina]
+        if filtro_material:
+            solicitudes_filtradas = [s for s in solicitudes_filtradas if filtro_material in s.get('material_nombre', '').lower()]
+        if filtro_solicitante:
+            solicitudes_filtradas = [s for s in solicitudes_filtradas if filtro_solicitante in s.get('usuario_solicitante', '').lower()]
+
+        data = []
+        for sol in solicitudes_filtradas:
+            material_nombre = sol.get('material_nombre', 'N/A')
+            if materiales_dict and materiales_dict.get(sol.get('material_id')):
+                material_nombre = materiales_dict[sol.get('material_id')].get('nombre', material_nombre)
+            data.append({
+                'ID': sol.get('id', ''),
+                'Material': material_nombre,
+                'Cantidad Solicitada': sol.get('cantidad_solicitada', 0),
+                'Cantidad Aprobada': sol.get('cantidad_aprobada', 0),
+                'Solicitante': sol.get('usuario_solicitante', ''),
+                'Oficina': sol.get('oficina_nombre', ''),
+                'Estado': sol.get('estado', ''),
+                'Fecha Solicitud': sol.get('fecha_solicitud', ''),
+                'Fecha Aprobación': sol.get('fecha_aprobacion', ''),
+                'Observaciones': sol.get('observacion', '')
+            })
+
+        df = pd.DataFrame(data)
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Solicitudes', index=False)
+            worksheet = writer.sheets['Solicitudes']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                worksheet.column_dimensions[column_letter].width = (max_length + 2)
+        output.seek(0)
+
+        fecha_actual = pd.Timestamp.now().strftime('%Y-%m-%d')
+        filename = f'reporte_solicitudes_{fecha_actual}.xlsx'
+
+        return send_file(output,
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         as_attachment=True,
+                         download_name=filename)
+    except Exception as e:
+        print(f"❌ Error exportando solicitudes a Excel: {e}")
+        flash('Error al exportar el reporte de solicitudes a Excel', 'danger')
+        return redirect(url_for('reportes.reporte_solicitudes'))
+
+
+@reportes_bp.route('/inventario/exportar/excel')
+def exportar_inventario_excel():
+    if not _require_login():
+        return redirect('/login')
+    
+    try:
+        todos_materiales = MaterialModel.obtener_todos() or []
+        materiales = filtrar_por_oficina_usuario(todos_materiales, 'oficina_id')
+
+        materiales_bajo_stock = [m for m in materiales if (m.get('cantidad', 0) or 0) <= 10]
+        materiales_stock_normal = [m for m in materiales if (m.get('cantidad', 0) or 0) > 10]
+
+        def crear_dataframe_materiales(lista_materiales, nombre_hoja):
+            data = []
+            for mat in lista_materiales:
+                data.append({
+                    'ID': mat.get('id', ''),
+                    'Material': mat.get('nombre', ''),
+                    'Stock Actual': mat.get('cantidad', 0),
+                    'Valor Unitario': mat.get('valor_unitario', 0),
+                    'Valor Total': mat.get('valor_total', 0),
+                    'Oficina': mat.get('oficina_nombre', ''),
+                    'Creado por': mat.get('usuario_creador', ''),
+                    'Fecha Creación': mat.get('fecha_creacion', '')
+                })
+            return pd.DataFrame(data)
+
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            if materiales_bajo_stock:
+                df_bajo_stock = crear_dataframe_materiales(materiales_bajo_stock, 'Bajo Stock')
+                df_bajo_stock.to_excel(writer, sheet_name='Bajo Stock', index=False)
+            if materiales_stock_normal:
+                df_stock_normal = crear_dataframe_materiales(materiales_stock_normal, 'Stock Normal')
+                df_stock_normal.to_excel(writer, sheet_name='Stock Normal', index=False)
+
+            for sheet_name in writer.sheets:
+                worksheet = writer.sheets[sheet_name]
+                for column in worksheet.columns:
+                    max_length = 0
+                    column_letter = column[0].column_letter
+                    for cell in column:
+                        try:
+                            if len(str(cell.value)) > max_length:
+                                max_length = len(str(cell.value))
+                        except:
+                            pass
+                    worksheet.column_dimensions[column_letter].width = (max_length + 2)
+        output.seek(0)
+
+        fecha_actual = pd.Timestamp.now().strftime('%Y-%m-%d')
+        filename = f'reporte_inventario_{fecha_actual}.xlsx'
+
+        return send_file(output,
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                         as_attachment=True,
+                         download_name=filename)
+    except Exception as e:
+        print(f"❌ Error exportando inventario a Excel: {e}")
+        flash('Error al exportar el reporte de inventario a Excel', 'danger')
+        return redirect(url_for('reportes.reporte_inventario'))

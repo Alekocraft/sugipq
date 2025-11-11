@@ -22,8 +22,6 @@ from blueprints.solicitudes import solicitudes_bp
 from blueprints.oficinas import oficinas_bp
 from blueprints.aprobadores import aprobadores_bp
 from blueprints.reportes import reportes_bp
-
-# Agregar estos nuevos blueprints
 from blueprints.aprobacion import aprobacion_bp
 from blueprints.api import api_bp
 from blueprints.inventario_corporativo import inventario_corporativo_bp
@@ -46,7 +44,7 @@ app = Flask(
 
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
 app.config['JSON_AS_ASCII'] = False
-app.config['TEMPLATES_AUTO_RELOAD'] = True  # útil en desarrollo
+app.config['TEMPLATES_AUTO_RELOAD'] = True  
 
 # Configuración de uploads
 UPLOAD_FOLDER = 'static/uploads'
