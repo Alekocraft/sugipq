@@ -43,9 +43,10 @@
                                     <label class="form-label">Valor Unitario *</label>
                                     <input type="number" class="form-control" name="valor_unitario" min="0" step="0.01" value="{{ producto.valor_unitario }}" required>
                                 </div>
+                                <!-- En la sección de la columna derecha, agrega este campo después de Valor Unitario -->
                                 <div class="mb-3">
-                                    <label class="form-label">Cantidad Mínima</label>
-                                    <input type="number" class="form-control" name="cantidad_minima" min="0" value="{{ producto.cantidad_minima or 0 }}">
+                                    <label class="form-label">Cantidad *</label>
+                                    <input type="number" class="form-control" name="cantidad" min="0" value="{{ producto.cantidad }}" required>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Ubicación</label>

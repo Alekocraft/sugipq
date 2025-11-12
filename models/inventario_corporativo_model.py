@@ -1,6 +1,7 @@
 # models/inventario_corporativo_model.py
 from database import get_database_connection
 
+
 def generar_codigo_unico():
     conn = get_database_connection()
     cursor = conn.cursor()
@@ -216,7 +217,8 @@ class InventarioCorporativoModel:
             print(f"Error creando producto corporativo: {e}")
             try:
                 if conn: conn.rollback()
-            except: pass
+            except:
+                pass
             return None
         finally:
             if cursor: cursor.close()
@@ -224,32 +226,54 @@ class InventarioCorporativoModel:
 
     @staticmethod
     def actualizar(producto_id, codigo_unico, nombre, descripcion, categoria_id,
-                   proveedor_id, valor_unitario, cantidad_minima, ubicacion, es_asignable):
+                   proveedor_id, valor_unitario, cantidad, cantidad_minima,
+                   ubicacion, es_asignable, ruta_imagen=None):
+        """Actualizar producto incluyendo cantidad y ruta_imagen"""
         conn = get_database_connection()
         if not conn:
             return False
         cursor = None
         try:
             cursor = conn.cursor()
-            sql = """
-                UPDATE ProductosCorporativos 
-                SET CodigoUnico = ?, NombreProducto = ?, Descripcion = ?, 
-                    CategoriaId = ?, ProveedorId = ?, ValorUnitario = ?,
-                    CantidadMinima = ?, Ubicacion = ?, EsAsignable = ?
-                WHERE ProductoId = ? AND Activo = 1
-            """
-            cursor.execute(sql, (
-                codigo_unico, nombre, descripcion, int(categoria_id), int(proveedor_id),
-                float(valor_unitario), int(cantidad_minima or 0), ubicacion,
-                int(es_asignable), int(producto_id)
-            ))
+
+            if ruta_imagen:
+                sql = """
+                    UPDATE ProductosCorporativos 
+                    SET CodigoUnico = ?, NombreProducto = ?, Descripcion = ?, 
+                        CategoriaId = ?, ProveedorId = ?, ValorUnitario = ?,
+                        CantidadDisponible = ?, CantidadMinima = ?, Ubicacion = ?, 
+                        EsAsignable = ?, RutaImagen = ?
+                    WHERE ProductoId = ? AND Activo = 1
+                """
+                params = (
+                    codigo_unico, nombre, descripcion, int(categoria_id), int(proveedor_id),
+                    float(valor_unitario), int(cantidad), int(cantidad_minima or 0),
+                    ubicacion, int(es_asignable), ruta_imagen, int(producto_id)
+                )
+            else:
+                sql = """
+                    UPDATE ProductosCorporativos 
+                    SET CodigoUnico = ?, NombreProducto = ?, Descripcion = ?, 
+                        CategoriaId = ?, ProveedorId = ?, ValorUnitario = ?,
+                        CantidadDisponible = ?, CantidadMinima = ?, Ubicacion = ?, 
+                        EsAsignable = ?
+                    WHERE ProductoId = ? AND Activo = 1
+                """
+                params = (
+                    codigo_unico, nombre, descripcion, int(categoria_id), int(proveedor_id),
+                    float(valor_unitario), int(cantidad), int(cantidad_minima or 0),
+                    ubicacion, int(es_asignable), int(producto_id)
+                )
+
+            cursor.execute(sql, params)
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
             print(f"Error actualizando producto corporativo: {e}")
             try:
                 if conn: conn.rollback()
-            except: pass
+            except:
+                pass
             return False
         finally:
             if cursor: cursor.close()
@@ -271,14 +295,18 @@ class InventarioCorporativoModel:
                 VALUES (?, 'BAJA_PRODUCTO', 0, NULL, ?, GETDATE())
             """, (int(producto_id), usuario_accion))
             # Baja logica
-            cursor.execute("UPDATE ProductosCorporativos SET Activo = 0 WHERE ProductoId = ?", (int(producto_id),))
+            cursor.execute(
+                "UPDATE ProductosCorporativos SET Activo = 0 WHERE ProductoId = ?",
+                (int(producto_id),)
+            )
             conn.commit()
             return cursor.rowcount > 0
         except Exception as e:
             print(f"Error eliminando producto corporativo: {e}")
             try:
                 if conn: conn.rollback()
-            except: pass
+            except:
+                pass
             return False
         finally:
             if cursor: cursor.close()
@@ -361,9 +389,6 @@ class InventarioCorporativoModel:
             if conn: conn.close()
 
     # ================== ASIGNACIONES / TRAZABILIDAD ==================
-    # models/inventario_corporativo_model.py - CORREGIR LÍNEA 392
-    # =================================================================
-
     @staticmethod
     def asignar_a_oficina(producto_id, oficina_id, cantidad, usuario_accion):
         """
@@ -378,7 +403,9 @@ class InventarioCorporativoModel:
             cursor = conn.cursor()
 
             # 1. PRIMERO: Obtener un UsuarioId válido
-            cursor.execute("SELECT TOP 1 UsuarioId FROM Usuarios WHERE Activo = 1 ORDER BY UsuarioId")
+            cursor.execute(
+                "SELECT TOP 1 UsuarioId FROM Usuarios WHERE Activo = 1 ORDER BY UsuarioId"
+            )
             usuario_row = cursor.fetchone()
             if not usuario_row:
                 print("Error: No hay usuarios activos en la base de datos")
@@ -386,15 +413,19 @@ class InventarioCorporativoModel:
             usuario_asignado_id = usuario_row[0]
 
             # 2. Verificar stock
-            cursor.execute("SELECT CantidadDisponible FROM ProductosCorporativos WHERE ProductoId = ? AND Activo = 1", (int(producto_id),))
+            cursor.execute(
+                "SELECT CantidadDisponible FROM ProductosCorporativos "
+                "WHERE ProductoId = ? AND Activo = 1",
+                (int(producto_id),)
+            )
             row = cursor.fetchone()
             if not row:
                 return False
             stock = int(row[0])
             cant = int(cantidad)
-        
-            # ✅ CORRECCIÓN: Cambiar "oR" por "or"
-            if cant <= 0 or cant > stock:  # <- Línea corregida
+
+            # ✅ CORRECCIÓN: condición correcta
+            if cant <= 0 or cant > stock:
                 return False
 
             # 3. Descontar stock
@@ -424,7 +455,8 @@ class InventarioCorporativoModel:
             print(f"Error asignar_a_oficina: {e}")
             try:
                 if conn: conn.rollback()
-            except: pass
+            except:
+                pass
             return False
         finally:
             if cursor: cursor.close()
@@ -432,6 +464,7 @@ class InventarioCorporativoModel:
 
     @staticmethod
     def historial_asignaciones(producto_id):
+        """Obtener historial de asignaciones para un producto específico"""
         conn = get_database_connection()
         if not conn:
             return []
@@ -481,7 +514,10 @@ class InventarioCorporativoModel:
                 GROUP BY c.NombreCategoria
                 ORDER BY c.NombreCategoria
             """)
-            return [{'categoria': r[0], 'total_stock': int(r[1] or 0)} for r in cursor.fetchall()]
+            return [
+                {'categoria': r[0], 'total_stock': int(r[1] or 0)}
+                for r in cursor.fetchall()
+            ]
         except Exception as e:
             print(f"Error reporte_stock_por_categoria: {e}")
             return []
@@ -529,7 +565,13 @@ class InventarioCorporativoModel:
                 GROUP BY o.NombreOficina
                 ORDER BY o.NombreOficina
             """)
-            return [{'oficina': r[0], 'cantidad_asignaciones': int(r[1] or 0)} for r in cursor.fetchall()]
+            return [
+                {
+                    'oficina': r[0],
+                    'cantidad_asignaciones': int(r[1] or 0)
+                }
+                for r in cursor.fetchall()
+            ]
         except Exception as e:
             print(f"Error reporte_asignaciones_por_oficina: {e}")
             return []
@@ -650,15 +692,21 @@ class InventarioCorporativoModel:
         cursor = None
         try:
             cursor = conn.cursor()
-        
+
             # Total productos
-            cursor.execute("SELECT COUNT(*) FROM ProductosCorporativos WHERE Activo = 1")
+            cursor.execute(
+                "SELECT COUNT(*) FROM ProductosCorporativos WHERE Activo = 1"
+            )
             total_productos = cursor.fetchone()[0]
-        
+
             # Valor total inventario
-            cursor.execute("SELECT SUM(ValorUnitario * CantidadDisponible) FROM ProductosCorporativos WHERE Activo = 1")
+            cursor.execute("""
+                SELECT SUM(ValorUnitario * CantidadDisponible)
+                FROM ProductosCorporativos
+                WHERE Activo = 1
+            """)
             valor_total = cursor.fetchone()[0] or 0
-        
+
             # Productos con stock bajo
             cursor.execute("""
                 SELECT COUNT(*) 
@@ -667,15 +715,23 @@ class InventarioCorporativoModel:
                 AND (CantidadDisponible = 0 OR CantidadDisponible <= CantidadMinima)
             """)
             stock_bajo = cursor.fetchone()[0]
-        
+
             # Productos asignables
-            cursor.execute("SELECT COUNT(*) FROM ProductosCorporativos WHERE Activo = 1 AND EsAsignable = 1")
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM ProductosCorporativos
+                WHERE Activo = 1 AND EsAsignable = 1
+            """)
             asignables = cursor.fetchone()[0]
-        
+
             # Total categorías
-            cursor.execute("SELECT COUNT(DISTINCT CategoriaId) FROM ProductosCorporativos WHERE Activo = 1")
+            cursor.execute("""
+                SELECT COUNT(DISTINCT CategoriaId)
+                FROM ProductosCorporativos
+                WHERE Activo = 1
+            """)
             total_categorias = cursor.fetchone()[0]
-        
+
             return {
                 'total_productos': total_productos,
                 'valor_total': float(valor_total),
@@ -686,6 +742,65 @@ class InventarioCorporativoModel:
         except Exception as e:
             print(f"Error obtener_estadisticas_generales: {e}")
             return {}
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()
+
+    # ================== VISTAS POR TIPO DE OFICINA ==================
+    @staticmethod
+    def obtener_por_sede_principal():
+        """Obtiene productos de la sede principal"""
+        conn = get_database_connection()
+        if not conn:
+            return []
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * 
+                FROM InventarioCorporativo 
+                WHERE oficina = 'Sede Principal' 
+                   OR oficina IS NULL 
+                   OR oficina = ''
+                ORDER BY nombre
+            """)
+            productos = []
+            cols = [c[0] for c in cursor.description]
+            for row in cursor.fetchall():
+                productos.append(dict(zip(cols, row)))
+            return productos
+        except Exception as e:
+            print(f"Error obteniendo sede principal: {e}")
+            return []
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()
+
+    @staticmethod
+    def obtener_por_oficinas_servicio():
+        """Obtiene productos de oficinas de servicio (excluyendo sede principal)"""
+        conn = get_database_connection()
+        if not conn:
+            return []
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * 
+                FROM InventarioCorporativo 
+                WHERE oficina != 'Sede Principal' 
+                  AND oficina IS NOT NULL 
+                  AND oficina != ''
+                ORDER BY oficina, nombre
+            """)
+            productos = []
+            cols = [c[0] for c in cursor.description]
+            for row in cursor.fetchall():
+                productos.append(dict(zip(cols, row)))
+            return productos
+        except Exception as e:
+            print(f"Error obteniendo oficinas servicio: {e}")
+            return []
         finally:
             if cursor: cursor.close()
             if conn: conn.close()

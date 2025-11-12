@@ -28,16 +28,7 @@
         </div>
     </div>
 
-    <!-- DEBUG INFO - Quitar después -->
-    <div class="alert alert-warning">
-        <strong>DEBUG:</strong><br>
-        Rol en sesión: {{ session.rol }}<br>
-        ¿Puede acceder a material_pop? {{ can_access('material_pop') }}<br>
-        ¿Puede acceder a inventario_corporativo? {{ can_access('inventario_corporativo') }}<br>
-        ¿Puede acceder a prestamo_material? {{ can_access('prestamo_material') }}
-    </div>
-
-    <!-- Sección de módulos principales -->
+     <!-- Sección de módulos principales -->
     <div class="row g-4 mb-4">
 
         {% if can_access('material_pop') %}

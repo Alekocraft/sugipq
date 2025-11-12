@@ -12,7 +12,7 @@ ROLE_PERMISSIONS = {
             'oficinas': ['view', 'manage'],
             'aprobadores': ['view', 'manage'],
             'reportes': ['view_all'],
-            'inventario_corporativo': ['view', 'create', 'edit', 'delete', 'assign'],
+            'inventario_corporativo': ['view', 'create', 'edit', 'delete', 'assign', 'manage_sedes', 'manage_oficinas'],
             'prestamos': ['view', 'create', 'approve', 'reject', 'return', 'manage_materials']
         },
         'office_filter': 'all'
@@ -25,7 +25,7 @@ ROLE_PERMISSIONS = {
             'oficinas': ['view'],
             'aprobadores': ['view'],
             'reportes': ['view_all'],
-            'inventario_corporativo': ['view', 'create', 'edit', 'delete', 'assign'],
+            'inventario_corporativo': ['view', 'create', 'edit', 'delete', 'assign', 'manage_sedes', 'manage_oficinas'],
             'prestamos': ['view', 'create', 'approve', 'reject', 'return', 'manage_materials']
         },
         'office_filter': 'all'

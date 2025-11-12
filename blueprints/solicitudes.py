@@ -4,9 +4,9 @@ from models.solicitudes_model import SolicitudModel
 from models.materiales_model import MaterialModel
 from models.oficinas_model import OficinaModel
 from utils.filters import filtrar_por_oficina_usuario, verificar_acceso_oficina
-from utils.permissions import can_access  # ✅ NUEVO IMPORT
+from utils.permissions import can_access
 
-# Crear blueprint de solicitudes
+# Crear blueprint de solicitudes - ✅ CORREGIDO: Definir correctamente el blueprint
 solicitudes_bp = Blueprint('solicitudes', __name__, url_prefix='/solicitudes')
 
 # Helpers de autenticación locales
@@ -313,4 +313,48 @@ def rechazar_solicitud(solicitud_id):
     except Exception as e:
         print(f"❌ Error rechazando solicitud: {e}")
         flash('Error al rechazar la solicitud', 'danger')
+    return redirect(url_for('solicitudes.listar_solicitudes'))
+
+# ✅ NUEVA RUTA: Registrar devolución
+@solicitudes_bp.route('/devolucion/<int:solicitud_id>', methods=['POST'])
+def registrar_devolucion(solicitud_id):
+    if not _require_login():
+        return redirect('/login')
+
+    # ✅ Todos EXCEPTO tesoreria
+    rol = session.get('rol', '')
+    if rol == 'tesoreria':
+        flash('No tiene permisos para acceder a esta sección', 'danger')
+        return redirect('/reportes')
+
+    try:
+        # Verificar acceso a la solicitud
+        solicitud = SolicitudModel.obtener_por_id(solicitud_id)
+        if not solicitud or not verificar_acceso_oficina(solicitud.get('oficina_id')):
+            flash('No tiene permisos para procesar esta solicitud', 'danger')
+            return redirect(url_for('solicitudes.listar_solicitudes'))
+
+        cantidad_devuelta = int(request.form.get('cantidad_devuelta', 0))
+        observacion = request.form.get('observacion', '').strip()
+        usuario_id = session['usuario_id']
+
+        if cantidad_devuelta <= 0:
+            flash('La cantidad devuelta debe ser mayor que 0', 'danger')
+            return redirect(url_for('solicitudes.listar_solicitudes'))
+
+        success, message = SolicitudModel.registrar_devolucion(
+            solicitud_id, usuario_id, cantidad_devuelta, observacion
+        )
+        
+        if success:
+            flash(message, 'success')
+        else:
+            flash(message, 'danger')
+            
+    except ValueError:
+        flash('La cantidad devuelta debe ser un número válido', 'danger')
+    except Exception as e:
+        print(f"❌ Error registrando devolución: {e}")
+        flash('Error al registrar la devolución', 'danger')
+        
     return redirect(url_for('solicitudes.listar_solicitudes'))

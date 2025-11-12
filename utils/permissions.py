@@ -49,6 +49,21 @@ class PermissionManager:
         return role in roles_con_acciones
 
     @staticmethod
+    def can_manage_inventario_corporativo() -> bool:
+        """Verifica si puede gestionar inventario corporativo (sedes y oficinas)"""
+        role = session.get('rol', '').lower()
+        
+        # ✅ SOLO ADMINISTRADOR Y LIDER_INVENTARIO PUEDEN GESTIONAR INVENTARIO CORPORATIVO
+        roles_con_gestion = {'administrador', 'lider_inventario'}
+        
+        return role in roles_con_gestion
+
+    @staticmethod
+    def can_view_inventario_actions() -> bool:
+        """Verifica si puede ver acciones en inventario corporativo"""
+        return PermissionManager.can_manage_inventario_corporativo()
+
+    @staticmethod
     def get_office_filter():
         """Obtiene el filtro de oficina para consultas
 
@@ -75,6 +90,14 @@ def can_access(module: str, action: Optional[str] = None) -> bool:
 
 def can_view_actions() -> bool:
     return PermissionManager.can_view_actions()
+
+
+def can_manage_inventario_corporativo() -> bool:
+    return PermissionManager.can_manage_inventario_corporativo()
+
+
+def can_view_inventario_actions() -> bool:
+    return PermissionManager.can_view_inventario_actions()
 
 
 def get_accessible_modules():

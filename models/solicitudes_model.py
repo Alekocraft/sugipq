@@ -112,6 +112,133 @@ class SolicitudModel:
             cursor.close()
             conn.close()
 
+    # ✅ NUEVO MÉTODO: Registrar devolución
+    @staticmethod
+    def registrar_devolucion(solicitud_id, usuario_id, cantidad_devuelta, observacion=""):
+        """Registra la devolución de una solicitud aprobada"""
+        conn = get_database_connection()
+        if conn is None:
+            return False, "Error de conexión"
+    
+        cursor = conn.cursor()
+        try:
+            # Verificar que la solicitud existe y está aprobada
+            cursor.execute("""
+                SELECT EstadoId, MaterialId, CantidadSolicitada, CantidadEntregada
+                FROM dbo.SolicitudesMaterial 
+                WHERE SolicitudId = ?
+            """, (solicitud_id,))
+        
+            solicitud = cursor.fetchone()
+            if not solicitud:
+                return False, "Solicitud no encontrada"
+        
+            estado_id, material_id, cantidad_solicitada, cantidad_entregada = solicitud
+        
+            if estado_id != 2:  # 2 = Aprobada
+                return False, "Solo se pueden devolver solicitudes en estado Aprobada"
+        
+            # Validar cantidad devuelta
+            if cantidad_devuelta <= 0:
+                return False, "La cantidad devuelta debe ser mayor a 0"
+        
+            # ✅ CORRECCIÓN: Usar cantidad_solicitada en lugar de cantidad_entregada
+            if cantidad_devuelta > cantidad_solicitada:
+                return False, f"No se pueden devolver más de {cantidad_solicitada} unidades"
+        
+            # Registrar la devolución - EstadoId 5 = Devuelta
+            cursor.execute("""
+                UPDATE dbo.SolicitudesMaterial 
+                SET CantidadEntregada = ?,
+                    EstadoId = 5  -- Estado: Devuelta
+                WHERE SolicitudId = ?
+            """, (cantidad_devuelta, solicitud_id))
+        
+            # Actualizar stock del material
+            cursor.execute("""
+                UPDATE dbo.Materiales 
+                SET CantidadDisponible = CantidadDisponible + ?
+                WHERE MaterialId = ?
+            """, (cantidad_devuelta, material_id))
+        
+            # Registrar en historial
+            cursor.execute("""
+                INSERT INTO dbo.HistorialEntregas 
+                (SolicitudId, CantidadEntregada, UsuarioEntrega, Observaciones, TipoMovimiento)
+                VALUES (?, ?, ?, ?, 'DEVOLUCION')
+            """, (solicitud_id, cantidad_devuelta, usuario_id, observacion))
+        
+            conn.commit()
+            return True, f"✅ Devolución de {cantidad_devuelta} unidades registrada exitosamente"
+        
+        except Exception as e:
+            conn.rollback()
+            return False, f"❌ Error al registrar devolución: {str(e)}"
+        finally:
+            cursor.close()
+            conn.close()
+        """Registra la devolución de una solicitud aprobada"""
+        conn = get_database_connection()
+        if conn is None:
+            return False, "Error de conexión"
+        
+        cursor = conn.cursor()
+        try:
+            # Verificar que la solicitud existe y está aprobada
+            cursor.execute("""
+                SELECT EstadoId, MaterialId, CantidadSolicitada, CantidadEntregada
+                FROM dbo.SolicitudesMaterial 
+                WHERE SolicitudId = ?
+            """, (solicitud_id,))
+            
+            solicitud = cursor.fetchone()
+            if not solicitud:
+                return False, "Solicitud no encontrada"
+            
+            estado_id, material_id, cantidad_solicitada, cantidad_entregada = solicitud
+            
+            if estado_id != 2:  # 2 = Aprobada
+                return False, "Solo se pueden devolver solicitudes en estado Aprobada"
+            
+            # Validar cantidad devuelta
+            if cantidad_devuelta <= 0:
+                return False, "La cantidad devuelta debe ser mayor a 0"
+            
+            if cantidad_devuelta > cantidad_entregada:
+                return False, f"No se pueden devolver más de {cantidad_entregada} unidades"
+            
+            # Registrar la devolución
+            cursor.execute("""
+                UPDATE dbo.SolicitudesMaterial 
+                SET CantidadEntregada = CantidadEntregada - ?,
+                    EstadoId = 4  -- Estado: Devuelta
+                WHERE SolicitudId = ?
+            """, (cantidad_devuelta, solicitud_id))
+            
+            # Actualizar stock del material
+            cursor.execute("""
+                UPDATE dbo.Materiales 
+                SET CantidadDisponible = CantidadDisponible + ?
+                WHERE MaterialId = ?
+            """, (cantidad_devuelta, material_id))
+            
+            # Registrar en historial
+            cursor.execute("""
+                INSERT INTO dbo.HistorialEntregas 
+                (SolicitudId, CantidadEntregada, UsuarioEntrega, Observaciones, TipoMovimiento)
+                VALUES (?, ?, ?, ?, 'DEVOLUCION')
+            """, (solicitud_id, -cantidad_devuelta, usuario_id, observacion))
+            
+            conn.commit()
+            return True, f"✅ Devolución de {cantidad_devuelta} unidades registrada exitosamente"
+            
+        except Exception as e:
+            conn.rollback()
+            return False, f"❌ Error al registrar devolución: {str(e)}"
+        finally:
+            cursor.close()
+            conn.close()
+
     # ✅ MODIFICADO: Ahora acepta oficina_id opcional
     @staticmethod
     def obtener_todas(oficina_id=None):
@@ -203,7 +330,8 @@ class SolicitudModel:
                         WHEN 'Pendiente' THEN 1
                         WHEN 'Aprobada' THEN 2
                         WHEN 'Rechazada' THEN 3
-                        ELSE 4
+                        WHEN 'Devuelta' THEN 4
+                        ELSE 5
                     END,
                     sm.FechaSolicitud DESC
             """

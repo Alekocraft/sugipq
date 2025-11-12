@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-# routes_inventario_corporativo.py (sin acentos para evitar errores de encoding en Windows)
+# routes_inventario_corporativo.py  
 from flask import Blueprint, render_template, request, redirect, session, flash, url_for
 from models.inventario_corporativo_model import InventarioCorporativoModel, generar_codigo_unico
 from datetime import datetime
+
 
 bp_inv = Blueprint('invcorp', __name__)
 
@@ -268,3 +269,144 @@ def inv_reportes():
     except Exception as e:
         flash(f'Error al generar reportes: {str(e)}', 'danger')
         return redirect('/inventario-corporativo')
+
+
+@bp_inv.route('/inventario-corporativo/sede-principal')
+def inv_sede_principal():
+    if not _require_login():
+        return redirect('/login')
+    
+    # Verificar permisos
+    if not _has_role('administrador', 'lider_inventario', 'inventario_corporativo'):
+        flash('No tiene permisos para acceder a esta sección', 'danger')
+        return redirect('/dashboard')
+    
+    try:
+        # ✅ USAR MÉTODO EXISTENTE: obtener_todos y filtrar por sede principal
+        productos = InventarioCorporativoModel.obtener_todos()
+        productos_sede = [p for p in productos if p.get('oficina') == 'Sede Principal' or not p.get('oficina')]
+        
+        # Calcular estadísticas
+        valor_total = sum(p.get('valor_unitario', 0) * p.get('cantidad', 0) for p in productos_sede)
+        productos_bajo_stock = len([p for p in productos_sede if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)])
+        total_productos = len(productos_sede)
+        
+        return render_template('inventario_corporativo/listar_con_filtros.html',
+                            productos=productos_sede,
+                            titulo="Sede Principal",
+                            subtitulo="Productos en sede central",
+                            valor_total=valor_total,
+                            productos_bajo_stock=productos_bajo_stock,
+                            total_productos=total_productos,
+                            total_oficinas=1,  # Solo sede principal
+                            tipo='sede_principal')
+                             
+    except Exception as e:
+        print(f"❌ Error cargando sede principal: {e}")
+        flash('Error al cargar los productos de sede principal', 'danger')
+        return render_template('inventario_corporativo/listar_con_filtros.html',
+                            productos=[],
+                            titulo="Sede Principal",
+                            subtitulo="Productos en sede central",
+                            valor_total=0,
+                            productos_bajo_stock=0,
+                            total_productos=0,
+                            total_oficinas=1,
+                            tipo='sede_principal')
+
+@bp_inv.route('/inventario-corporativo/oficinas-servicio')
+def inv_oficinas_servicio():
+    if not _require_login():
+        return redirect('/login')
+    
+    # Verificar permisos
+    if not _has_role('administrador', 'lider_inventario', 'inventario_corporativo'):
+        flash('No tiene permisos para acceder a esta sección', 'danger')
+        return redirect('/dashboard')
+    
+    try:
+        # ✅ USAR MÉTODO EXISTENTE: obtener_todos y filtrar por oficinas de servicio
+        productos = InventarioCorporativoModel.obtener_todos()
+        productos_oficinas = [p for p in productos if p.get('oficina') and p.get('oficina') != 'Sede Principal']
+        
+        # Calcular estadísticas
+        valor_total = sum(p.get('valor_unitario', 0) * p.get('cantidad', 0) for p in productos_oficinas)
+        productos_bajo_stock = len([p for p in productos_oficinas if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)])
+        total_productos = len(productos_oficinas)
+        
+        # Obtener oficinas únicas para el filtro
+        oficinas_unicas = list(set([p.get('oficina', '') for p in productos_oficinas if p.get('oficina')]))
+        total_oficinas = len(oficinas_unicas)
+        
+        return render_template('inventario_corporativo/listar_con_filtros.html',
+                            productos=productos_oficinas,
+                            titulo="Oficinas de Servicio",
+                            subtitulo="Productos distribuidos en oficinas",
+                            valor_total=valor_total,
+                            productos_bajo_stock=productos_bajo_stock,
+                            total_productos=total_productos,
+                            total_oficinas=total_oficinas,
+                            oficinas_filtradas=[{'nombre': oficina} for oficina in oficinas_unicas],
+                            tipo='oficinas_servicio')
+                             
+    except Exception as e:
+        print(f"❌ Error cargando oficinas de servicio: {e}")
+        flash('Error al cargar los productos de oficinas de servicio', 'danger')
+        return render_template('inventario_corporativo/listar_con_filtros.html',
+                            productos=[],
+                            titulo="Oficinas de Servicio",
+                            subtitulo="Productos distribuidos en oficinas",
+                            valor_total=0,
+                            productos_bajo_stock=0,
+                            total_productos=0,
+                            total_oficinas=0,
+                            oficinas_filtradas=[],
+                            tipo='oficinas_servicio')
+
+@bp_inv.route('/inventario-corporativo/oficinas-servicio')
+def inv_oficinas_servicio():
+    if not _require_login():
+        return redirect('/login')
+    
+    # Verificar permisos
+    if not _has_role('administrador', 'lider_inventario', 'inventario_corporativo'):
+        flash('No tiene permisos para acceder a esta sección', 'danger')
+        return redirect('/dashboard')
+    
+    try:
+        # Obtener productos de oficinas de servicio (excluyendo sede principal)
+        productos = InventarioCorporativoModel.obtener_por_oficinas_servicio()
+        
+        # Calcular estadísticas
+        valor_total = sum(p.get('valor_unitario', 0) * p.get('cantidad', 0) for p in productos)
+        productos_bajo_stock = len([p for p in productos if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)])
+        total_productos = len(productos)
+        
+        # Obtener oficinas únicas para el filtro
+        oficinas_unicas = list(set([p.get('oficina', '') for p in productos if p.get('oficina')]))
+        total_oficinas = len(oficinas_unicas)
+        
+        return render_template('inventario_corporativo/listar_con_filtros.html',
+                            productos=productos,
+                            titulo="Oficinas de Servicio",
+                            subtitulo="Productos distribuidos en oficinas",
+                            valor_total=valor_total,
+                            productos_bajo_stock=productos_bajo_stock,
+                            total_productos=total_productos,
+                            total_oficinas=total_oficinas,
+                            oficinas_filtradas=[{'nombre': oficina} for oficina in oficinas_unicas],
+                            tipo='oficinas_servicio')
+                             
+    except Exception as e:
+        print(f"❌ Error cargando oficinas de servicio: {e}")
+        flash('Error al cargar los productos de oficinas de servicio', 'danger')
+        return render_template('inventario_corporativo/listar_con_filtros.html',
+                            productos=[],
+                            titulo="Oficinas de Servicio",
+                            subtitulo="Productos distribuidos en oficinas",
+                            valor_total=0,
+                            productos_bajo_stock=0,
+                            total_productos=0,
+                            total_oficinas=0,
+                            oficinas_filtradas=[],
+                            tipo='oficinas_servicio')

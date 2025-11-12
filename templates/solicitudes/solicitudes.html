@@ -18,6 +18,7 @@
                                 <option value="pendiente" {% if filtro_estado=='pendiente' %}selected{% endif %}>Pendiente</option>
                                 <option value="aprobada" {% if filtro_estado=='aprobada' %}selected{% endif %}>Aprobada</option>
                                 <option value="rechazada" {% if filtro_estado=='rechazada' %}selected{% endif %}>Rechazada</option>
+                                <option value="devuelta" {% if filtro_estado=='devuelta' %}selected{% endif %}>Devuelta</option>
                             </select>
                         </div>
                         <div class="col-md-3">
@@ -141,6 +142,7 @@
                                 {% set user_rol = ((session.get('rol', 'usuario') or 'usuario')|string)|lower|trim %}
                                 {% set estado_normalizado = ((estado or 'pendiente')|string)|lower|trim %}
                                 {% set esta_pendiente = estado_normalizado == 'pendiente' or estado_normalizado.startswith('pend') %}
+                                {% set esta_aprobada = estado_normalizado == 'aprobada' or estado_normalizado.startswith('aprob') %}
                                 {% set tiene_permisos = user_rol in ['administrador', 'aprobador'] %}
 
                                 <tr>
@@ -173,36 +175,35 @@
                                         <span class="badge bg-success">✅ Aprobada</span>
                                         {% elif estado_normalizado == 'rechazada' %}
                                         <span class="badge bg-danger">❌ Rechazada</span>
+                                        {% elif estado_normalizado == 'devuelta' %}
+                                        <span class="badge bg-info">🔄 Devuelta</span>
                                         {% else %}
                                         <span class="badge bg-secondary">{{ estado }}</span>
                                         {% endif %}
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <!-- Ver (siempre visible) -->
-                                            
+                                            <!-- Ver -->
                                             <button type="button"
-                                                    class="btn btn-info btn-sm"
-                                                    onclick="verDetallesSolicitud(
+                                                class="btn btn-info btn-sm"
+                                                onclick='verDetallesSolicitud(
                                                     {{ solicitud.id }},
-                                                    '{{ material_nombre }}',
+                                                    {{ material_nombre|tojson }},
                                                     {{ solicitud.cantidad_solicitada }},
                                                     {{ stock_actual }},
-                                                    '{{ solicitante_nombre }}',
-                                                    '{{ oficina_nombre }}',
-                                                    '{{ fecha_solicitud.strftime('%d/%m/%Y %H:%M') if fecha_solicitud != 'N/A' else 'N/A' }}',
-                                                    '{{ estado }}',
-                                                    {{ solicitud.porcentaje_oficina }},
-                                                    {{ solicitud.valor_total_solicitado }},
-                                                    {{ solicitud.valor_oficina }},
-                                                    {{ solicitud.valor_sede }},
-                                                    '{{ solicitud.observacion | replace("'", "\\'") }}'
-                                                )"
-                                                    title="Ver detalles completos">
-                                                     👁️ Ver
+                                                    {{ solicitante_nombre|tojson }},
+                                                    {{ oficina_nombre|tojson }},
+                                                    {{ (fecha_solicitud.strftime("%d/%m/%Y %H:%M") if fecha_solicitud != "N/A" else "N/A")|tojson }},
+                                                    {{ estado|tojson }},
+                                                    {{ solicitud.porcentaje_oficina|default(0) }},
+                                                    {{ solicitud.valor_total_solicitado|default(0) }},
+                                                    {{ solicitud.valor_oficina|default(0) }},
+                                                    {{ solicitud.valor_sede|default(0) }},
+                                                    {{ solicitud.observacion|default("")|tojson }}
+                                                )'
+                                                title="Ver detalles completos">
+                                                👁️ Ver
                                             </button>
-
-
 
                                             <!-- BOTONES DE APROBACIÓN: solo admin/aprobador y si está pendiente -->
                                             {% if tiene_permisos and esta_pendiente %}
@@ -216,16 +217,26 @@
 
                                             <button type="button"
                                                     class="btn btn-warning btn-sm"
-                                                    onclick="mostrarModalAprobacionParcial({{ solicitud.id }}, {{ solicitud.cantidad_solicitada }}, '{{ material_nombre }}', '{{ solicitante_nombre }}')"
+                                                    onclick='mostrarModalAprobacionParcial({{ solicitud.id }}, {{ solicitud.cantidad_solicitada }}, {{ material_nombre|tojson }}, {{ solicitante_nombre|tojson }})'
                                                     title="Aprobación parcial">
                                                 ⚠️ Parcial
                                             </button>
 
                                             <button type="button"
                                                     class="btn btn-danger btn-sm"
-                                                    onclick="mostrarModalRechazar({{ solicitud.id }}, '{{ material_nombre }}', '{{ solicitante_nombre }}')"
+                                                    onclick='mostrarModalRechazar({{ solicitud.id }}, {{ material_nombre|tojson }}, {{ solicitante_nombre|tojson }})'
                                                     title="Rechazar solicitud">
                                                 ❌ Rechazar
+                                            </button>
+                                            {% endif %}
+
+                                            <!-- BOTÓN DE DEVOLUCIÓN: solo admin/aprobador y si está aprobada -->
+                                            {% if tiene_permisos and esta_aprobada %}
+                                            <button type="button"
+                                                    class="btn btn-info btn-sm"
+                                                    onclick='mostrarModalDevolucion({{ solicitud.id }}, {{ solicitud.cantidad_solicitada }}, {{ material_nombre|tojson }}, {{ solicitante_nombre|tojson }})'
+                                                    title="Registrar devolución">
+                                                🔄 Devolución
                                             </button>
                                             {% endif %}
                                         </div>
@@ -326,6 +337,41 @@
     </div>
 </div>
 
+<!-- Modal para devolución -->
+<div class="modal fade" id="modalDevolucion" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title">🔄 Registrar Devolución</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <strong id="infoMaterialDevolucion"></strong><br>
+                    <strong>Solicitante:</strong> <span id="infoSolicitanteDevolucion"></span><br>
+                    <strong>Cantidad máxima a devolver:</strong> <span id="infoCantidadDevolucion"></span>
+                </div>
+                <form id="formDevolucion" method="POST">
+                    <input type="hidden" id="solicitud_id_devolucion" name="solicitud_id">
+                    <div class="mb-3">
+                        <label for="cantidad_devuelta" class="form-label">Cantidad a devolver:</label>
+                        <input type="number" class="form-control" id="cantidad_devuelta" name="cantidad_devuelta" min="1" required>
+                        <small class="form-text text-muted" id="maximo_devolucion"></small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="observacion_devolucion" class="form-label">Observación (opcional):</label>
+                        <textarea class="form-control" id="observacion_devolucion" name="observacion" rows="3" placeholder="Observación sobre la devolución..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-info" onclick="confirmarDevolucion()">✅ Confirmar Devolución</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
     .table th {
         white-space: nowrap;
@@ -341,11 +387,10 @@
         cursor: pointer;
         transition: all 0.3s ease;
     }
-
-        .clickable-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
+    .clickable-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
 </style>
 {% endblock %}
 
@@ -364,7 +409,7 @@
             <div class="col-md-6">
                 <h6>Información Básica</h6>
                 <p><strong>ID:</strong> #${solicitudId}</p>
-                <p><strong>Estado:</strong> <span class="badge ${estado.toLowerCase() === 'pendiente' ? 'bg-warning' : estado.toLowerCase() === 'aprobada' ? 'bg-success' : 'bg-danger'}">${estado}</span></p>
+                <p><strong>Estado:</strong> <span class="badge ${estado.toLowerCase() === 'pendiente' ? 'bg-warning' : estado.toLowerCase() === 'aprobada' ? 'bg-success' : estado.toLowerCase() === 'devuelta' ? 'bg-info' : 'bg-danger'}">${estado}</span></p>
                 <p><strong>Fecha de Solicitud:</strong> ${fechaSolicitud}</p>
                 <p><strong>Observación:</strong> ${observacion || 'Sin observación'}</p>
             </div>
@@ -459,6 +504,41 @@
         const motivo = document.getElementById('observacion').value.trim();
         if (!motivo) { alert('Por favor ingrese un motivo para el rechazo'); return; }
         document.getElementById('formRechazar').submit();
+    }
+
+    // ✅ DEVOLUCIÓN (usa cantidad_solicitada como máximo)
+    function mostrarModalDevolucion(solicitudId, cantidadMaxima, materialNombre, solicitanteNombre) {
+        document.getElementById('solicitud_id_devolucion').value = solicitudId;
+        document.getElementById('infoMaterialDevolucion').textContent = materialNombre;
+        document.getElementById('infoSolicitanteDevolucion').textContent = solicitanteNombre;
+        document.getElementById('infoCantidadDevolucion').textContent = cantidadMaxima;
+
+        const inputCantidad = document.getElementById('cantidad_devuelta');
+        const maximoTexto = document.getElementById('maximo_devolucion');
+
+        inputCantidad.value = '';
+        inputCantidad.max = cantidadMaxima;
+        inputCantidad.placeholder = `Máximo: ${cantidadMaxima}`;
+        maximoTexto.textContent = `Cantidad máxima a devolver: ${cantidadMaxima} unidades (cantidad solicitada)`;
+        document.getElementById('formDevolucion').action = `/solicitudes/devolucion/${solicitudId}`;
+
+        new bootstrap.Modal(document.getElementById('modalDevolucion')).show();
+    }
+
+    function confirmarDevolucion() {
+        const cantidad = parseInt(document.getElementById('cantidad_devuelta').value);
+        const cantidadMaxima = parseInt(document.getElementById('cantidad_devuelta').max);
+        
+        if (!cantidad || cantidad < 1) { 
+            alert('Por favor ingrese una cantidad válida (mínimo 1)'); 
+            return; 
+        }
+        if (cantidad > cantidadMaxima) { 
+            alert(`La cantidad no puede ser mayor a ${cantidadMaxima} (cantidad solicitada)`); 
+            return; 
+        }
+        
+        document.getElementById('formDevolucion').submit();
     }
 </script>
 {% endblock %}

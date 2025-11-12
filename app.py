@@ -34,11 +34,25 @@ from blueprints.aprobadores import aprobadores_bp
 from blueprints.reportes import reportes_bp
 from blueprints.aprobacion import aprobacion_bp
 from blueprints.api import api_bp
-from blueprints.inventario_corporativo import inventario_corporativo_bp
 
-# Importación adicional de rutas (si conviven con blueprints dedicados)
+# SOLUCIÓN: Solo importar UN blueprint de inventario corporativo
+try:
+    from blueprints.inventario_corporativo import inventario_corporativo_bp
+    HAS_INVENTARIO_BP = True
+except ImportError:
+    HAS_INVENTARIO_BP = False
+    print("⚠️  Blueprint de inventario corporativo no encontrado en blueprints/")
+
+# Importar solo si no existe el blueprint en blueprints/
+if not HAS_INVENTARIO_BP:
+    try:
+        from routes_inventario_corporativo import bp_inv as inventario_corporativo_bp
+        print("✅ Usando blueprint de inventario desde routes_inventario_corporativo")
+    except ImportError:
+        print("❌ No se pudo importar ningún blueprint de inventario corporativo")
+
+# Importación adicional de rutas
 from routes_prestamos import bp_prestamos
-from routes_inventario_corporativo import bp_inv as bp_inventario_corporativo
 
 # ===============================
 # 💾 Conexión a Base de Datos
@@ -89,23 +103,29 @@ def inject_permissions():
 # ===============================
 # 🔗 Registro de Blueprints
 # ===============================
-# ⚠️ IMPORTANTE: Asegúrate de que cada blueprint define su propio url_prefix
-# dentro del módulo, o ajusta aquí usando: app.register_blueprint(bp, url_prefix="/ruta")
-
-# Rutas adicionales (no-blueprint o BP definidos fuera de /blueprints)
+# Rutas adicionales
 app.register_blueprint(bp_prestamos)
-app.register_blueprint(bp_inventario_corporativo)
 
 # Blueprints principales
 app.register_blueprint(auth_bp)
-app.register_blueprint(materiales_bp)      # ✅ materiales_bp registrado
-app.register_blueprint(solicitudes_bp)     # ✅ solicitudes_bp registrado
+app.register_blueprint(materiales_bp)
+app.register_blueprint(solicitudes_bp)
 app.register_blueprint(oficinas_bp)
 app.register_blueprint(aprobadores_bp)
 app.register_blueprint(reportes_bp)
 app.register_blueprint(aprobacion_bp)
 app.register_blueprint(api_bp)
-app.register_blueprint(inventario_corporativo_bp)
+
+# SOLUCIÓN: Registrar solo UN blueprint de inventario corporativo
+if HAS_INVENTARIO_BP:
+    app.register_blueprint(inventario_corporativo_bp)
+    print("✅ Blueprint de inventario registrado desde blueprints/")
+else:
+    try:
+        app.register_blueprint(inventario_corporativo_bp)
+        print("✅ Blueprint de inventario registrado desde routes/")
+    except NameError:
+        print("⚠️  No se registró ningún blueprint de inventario corporativo")
 
 # ===============================
 # ✅ Verificación de Registro

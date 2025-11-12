@@ -8,12 +8,30 @@ from datetime import datetime
 
 inventario_corporativo_bp = Blueprint('inventario_corporativo', __name__)
 
+
+# =========================
+#  HELPERS DE AUTENTICACIÓN
+# =========================
+
+def _require_login():
+    return 'usuario_id' in session
+
+
+def _has_role(*roles):
+    """
+    Devuelve True si el rol del usuario está en la lista de roles permitidos.
+    """
+    rol = (session.get('rol', 'usuario') or 'usuario').strip().lower()
+    roles_norm = [r.lower() for r in roles]
+    return rol in roles_norm
+
+
 # ==========================================================
 # LISTAR INVENTARIO CORPORATIVO
 # ==========================================================
 @inventario_corporativo_bp.route('/inventario-corporativo')
 def listar_inventario_corporativo():
-    if 'usuario_id' not in session:
+    if not _require_login():
         return redirect('/login')
 
     productos = InventarioCorporativoModel.obtener_todos() or []
@@ -25,35 +43,80 @@ def listar_inventario_corporativo():
         total_productos=total_productos
     )
 
+
+# ==========================================================
+# VER DETALLE DE PRODUCTO (RUTA ORIGINAL)
+# ==========================================================
+@inventario_corporativo_bp.route('/inventario-corporativo/<int:producto_id>')
+def ver_detalle_producto(producto_id):
+    """
+    Ver detalle del producto.
+    SOLO para roles: administrador y lider_inventario.
+    """
+    if not _require_login():
+        return redirect('/login')
+
+    if not _has_role('administrador', 'lider_inventario'):
+        flash('No autorizado para ver el detalle de productos', 'danger')
+        return redirect('/inventario-corporativo')
+
+    try:
+        producto = InventarioCorporativoModel.obtener_por_id(producto_id)
+        if not producto:
+            flash('Producto no encontrado', 'danger')
+            return redirect('/inventario-corporativo')
+
+        # Usamos el historial correcto definido en el modelo
+        historial = InventarioCorporativoModel.historial_asignaciones(producto_id) or []
+
+        return render_template(
+            'inventario_corporativo/detalle.html',
+            producto=producto,
+            historial=historial
+        )
+    except Exception as e:
+        print(f"❌ Error al cargar detalle del producto: {e}")
+        flash('Error al cargar el producto', 'danger')
+        return redirect('/inventario-corporativo')
+
+
 # ==========================================================
 # CREAR PRODUCTO CORPORATIVO
 # ==========================================================
 @inventario_corporativo_bp.route('/inventario-corporativo/crear', methods=['GET', 'POST'])
 def crear_inventario_corporativo():
-    if 'usuario_id' not in session:
+    if not _require_login():
         return redirect('/login')
+
+    # Crear solo admin / líder inventario
+    if not _has_role('administrador', 'lider_inventario'):
+        flash('No autorizado para crear productos', 'danger')
+        return redirect('/inventario-corporativo')
 
     categorias = InventarioCorporativoModel.obtener_categorias() or []
     proveedores = InventarioCorporativoModel.obtener_proveedores() or []
 
     if request.method == 'POST':
         try:
-            codigo_unico    = (request.form.get('codigo_unico') or '').strip()
-            nombre          = (request.form.get('nombre') or '').strip()
-            categoria_id    = int(request.form.get('categoria_id') or 0)
-            proveedor_id    = int(request.form.get('proveedor_id') or 0)
-            valor_unitario  = float(request.form.get('valor_unitario') or 0)
-            cantidad        = int(request.form.get('cantidad') or 0)
+            codigo_unico = (request.form.get('codigo_unico') or '').strip()
+            nombre = (request.form.get('nombre') or '').strip()
+            categoria_id = int(request.form.get('categoria_id') or 0)
+            proveedor_id = int(request.form.get('proveedor_id') or 0)
+            valor_unitario = float(request.form.get('valor_unitario') or 0)
+            cantidad = int(request.form.get('cantidad') or 0)
             cantidad_minima = int(request.form.get('cantidad_minima') or 0)
-            ubicacion       = (request.form.get('ubicacion') or '').strip()
-            descripcion     = (request.form.get('descripcion') or '').strip()
-            es_asignable    = 1 if request.form.get('es_asignable') == 'on' else 0
+            ubicacion = (request.form.get('ubicacion') or '').strip()
+            descripcion = (request.form.get('descripcion') or '').strip()
+            es_asignable = 1 if request.form.get('es_asignable') == 'on' else 0
             usuario_creador = (session.get('usuario', 'administrador') or 'administrador')
 
             if not codigo_unico or not nombre or categoria_id <= 0 or proveedor_id <= 0:
                 flash('Completa los campos obligatorios (*)', 'warning')
-                return render_template('inventario_corporativo/crear.html',
-                                       categorias=categorias, proveedores=proveedores)
+                return render_template(
+                    'inventario_corporativo/crear.html',
+                    categorias=categorias,
+                    proveedores=proveedores
+                )
 
             # Guardar imagen
             ruta_imagen = None
@@ -92,28 +155,253 @@ def crear_inventario_corporativo():
             print(f"[POST /inventario-corporativo/crear] Error: {e}")
             flash('❌ Ocurrió un error al guardar.', 'danger')
 
-        return render_template('inventario_corporativo/crear.html',
-                               categorias=categorias, proveedores=proveedores)
+        return render_template(
+            'inventario_corporativo/crear.html',
+            categorias=categorias,
+            proveedores=proveedores
+        )
 
-    return render_template('inventario_corporativo/crear.html',
-                           categorias=categorias, proveedores=proveedores)
+    return render_template(
+        'inventario_corporativo/crear.html',
+        categorias=categorias,
+        proveedores=proveedores
+    )
+
 
 # ==========================================================
-# FUNCIONES AUXILIARES
+# EDITAR PRODUCTO CORPORATIVO
+# ==========================================================
+@inventario_corporativo_bp.route('/inventario-corporativo/editar/<int:producto_id>', methods=['GET', 'POST'])
+def editar_producto_corporativo(producto_id):
+    if not _require_login():
+        return redirect('/login')
+
+    if not _has_role('administrador', 'lider_inventario'):
+        flash('No autorizado para editar productos', 'danger')
+        return redirect('/inventario-corporativo')
+
+    try:
+        producto = InventarioCorporativoModel.obtener_por_id(producto_id)
+        if not producto:
+            flash('Producto no encontrado', 'danger')
+            return redirect('/inventario-corporativo')
+
+        categorias = InventarioCorporativoModel.obtener_categorias() or []
+        proveedores = InventarioCorporativoModel.obtener_proveedores() or []
+
+        if request.method == 'POST':
+            codigo_unico = (request.form.get('codigo_unico') or '').strip()
+            nombre = (request.form.get('nombre') or '').strip()
+            categoria_id = int(request.form.get('categoria_id') or 0)
+            proveedor_id = int(request.form.get('proveedor_id') or 0)
+            valor_unitario = float(request.form.get('valor_unitario') or 0)
+            cantidad = int(request.form.get('cantidad') or 0)
+            cantidad_minima = int(request.form.get('cantidad_minima') or 0)
+            ubicacion = (request.form.get('ubicacion') or '').strip()
+            descripcion = (request.form.get('descripcion') or '').strip()
+            es_asignable = 1 if request.form.get('es_asignable') == 'on' else 0
+
+            if not codigo_unico or not nombre or categoria_id <= 0 or proveedor_id <= 0:
+                flash('Completa los campos obligatorios (*)', 'warning')
+                return render_template(
+                    'inventario_corporativo/editar.html',
+                    producto=producto,
+                    categorias=categorias,
+                    proveedores=proveedores
+                )
+
+            # Guardar imagen
+            ruta_imagen = producto.get('ruta_imagen')
+            archivo = request.files.get('imagen')
+            if archivo and archivo.filename:
+                filename = secure_filename(archivo.filename)
+                upload_dir = os.path.join('static', 'uploads', 'productos')
+                os.makedirs(upload_dir, exist_ok=True)
+                filepath = os.path.join(upload_dir, filename)
+                archivo.save(filepath)
+                ruta_imagen = '/' + filepath.replace('\\', '/')
+
+            # Actualizar registro (coincidiendo con la firma del modelo)
+            actualizado = InventarioCorporativoModel.actualizar(
+                producto_id=producto_id,
+                codigo_unico=codigo_unico,
+                nombre=nombre,
+                descripcion=descripcion,
+                categoria_id=categoria_id,
+                proveedor_id=proveedor_id,
+                valor_unitario=valor_unitario,
+                cantidad=cantidad,
+                cantidad_minima=cantidad_minima,
+                ubicacion=ubicacion,
+                es_asignable=es_asignable,
+                ruta_imagen=ruta_imagen
+            )
+
+            if actualizado:
+                flash('✅ Producto actualizado correctamente.', 'success')
+                return redirect(f'/inventario-corporativo/{producto_id}')
+            else:
+                flash('❌ No fue posible actualizar el producto.', 'danger')
+
+        return render_template(
+            'inventario_corporativo/editar.html',
+            producto=producto,
+            categorias=categorias,
+            proveedores=proveedores
+        )
+
+    except Exception as e:
+        print(f"❌ Error al editar producto: {e}")
+        flash('Error al cargar el producto para editar', 'danger')
+        return redirect('/inventario-corporativo')
+
+
+# ==========================================================
+# ASIGNAR PRODUCTO CORPORATIVO
+# ==========================================================
+@inventario_corporativo_bp.route('/inventario-corporativo/asignar/<int:producto_id>', methods=['GET', 'POST'])
+def asignar_producto_corporativo(producto_id):
+    """
+    Asignar producto a oficina.
+    SOLO admin / lider_inventario.
+    """
+    if not _require_login():
+        return redirect('/login')
+
+    if not _has_role('administrador', 'lider_inventario'):
+        flash('No autorizado para asignar productos', 'danger')
+        return redirect('/inventario-corporativo')
+
+    try:
+        producto = InventarioCorporativoModel.obtener_por_id(producto_id)
+        if not producto:
+            flash('Producto no encontrado', 'danger')
+            return redirect('/inventario-corporativo')
+
+        # No permitir asignar si el producto no es asignable
+        if not producto.get('es_asignable'):
+            flash('Este producto no es asignable', 'warning')
+            return redirect(f'/inventario-corporativo/{producto_id}')
+
+        oficinas = InventarioCorporativoModel.obtener_oficinas() or []
+        historial = InventarioCorporativoModel.historial_asignaciones(producto_id) or []
+
+        if request.method == 'POST':
+            oficina_id = int(request.form.get('oficina_id') or 0)
+            cantidad_asignar = int(request.form.get('cantidad') or 0)
+
+            if not oficina_id or cantidad_asignar <= 0:
+                flash('Complete todos los campos requeridos', 'warning')
+                return render_template(
+                    'inventario_corporativo/asignar.html',
+                    producto=producto,
+                    oficinas=oficinas,
+                    historial=historial
+                )
+
+            if cantidad_asignar > producto.get('cantidad', 0):
+                flash('No hay suficiente stock disponible', 'danger')
+                return render_template(
+                    'inventario_corporativo/asignar.html',
+                    producto=producto,
+                    oficinas=oficinas,
+                    historial=historial
+                )
+
+            asignado = InventarioCorporativoModel.asignar_a_oficina(
+                producto_id=producto_id,
+                oficina_id=oficina_id,
+                cantidad=cantidad_asignar,
+                usuario_accion=session.get('usuario', 'Sistema')
+            )
+
+            if asignado:
+                flash('✅ Producto asignado correctamente a la oficina.', 'success')
+                return redirect(f'/inventario-corporativo/{producto_id}')
+            else:
+                flash('❌ No fue posible asignar el producto.', 'danger')
+
+        return render_template(
+            'inventario_corporativo/asignar.html',
+            producto=producto,
+            oficinas=oficinas,
+            historial=historial
+        )
+
+    except Exception as e:
+        print(f"❌ Error al asignar producto: {e}")
+        flash('Error al cargar el producto para asignar', 'danger')
+        return redirect('/inventario-corporativo')
+
+
+# ==========================================================
+# ELIMINAR PRODUCTO CORPORATIVO
+# ==========================================================
+@inventario_corporativo_bp.route('/inventario-corporativo/eliminar/<int:producto_id>', methods=['POST'])
+def eliminar_producto_corporativo(producto_id):
+    """
+    Eliminar (baja lógica) producto.
+    SOLO admin / lider_inventario.
+    """
+    if not _require_login():
+        return redirect('/login')
+
+    if not _has_role('administrador', 'lider_inventario'):
+        flash('No autorizado para eliminar productos', 'danger')
+        return redirect('/inventario-corporativo')
+
+    try:
+        producto = InventarioCorporativoModel.obtener_por_id(producto_id)
+        if not producto:
+            flash('Producto no encontrado', 'danger')
+            return redirect('/inventario-corporativo')
+
+        # Eliminar usando la firma correcta (producto_id, usuario_accion)
+        eliminado = InventarioCorporativoModel.eliminar(
+            producto_id,
+            session.get('usuario', 'Sistema')
+        )
+
+        if eliminado:
+            flash('✅ Producto eliminado correctamente.', 'success')
+        else:
+            flash('❌ No fue posible eliminar el producto.', 'danger')
+
+    except Exception as e:
+        print(f"❌ Error al eliminar producto: {e}")
+        flash('Error al eliminar el producto', 'danger')
+
+    return redirect('/inventario-corporativo')
+
+
+# ==========================================================
+# FUNCIONES AUXILIARES DE FILTROS
 # ==========================================================
 def aplicar_filtros_adicionales(productos, oficina, categoria, stock):
     productos_filtrados = productos.copy()
-    
+
     if oficina:
         if oficina == 'Sede Principal':
-            productos_filtrados = [p for p in productos_filtrados if p.get('oficina', 'Sede Principal') == 'Sede Principal']
+            productos_filtrados = [
+                p for p in productos_filtrados
+                if p.get('oficina', 'Sede Principal') == 'Sede Principal'
+            ]
         elif oficina == 'Oficinas de Servicio':
-            productos_filtrados = [p for p in productos_filtrados if p.get('oficina', 'Sede Principal') != 'Sede Principal']
+            productos_filtrados = [
+                p for p in productos_filtrados
+                if p.get('oficina', 'Sede Principal') != 'Sede Principal'
+            ]
         else:
-            productos_filtrados = [p for p in productos_filtrados if p.get('oficina', '') == oficina]
+            productos_filtrados = [
+                p for p in productos_filtrados
+                if p.get('oficina', '') == oficina
+            ]
 
     if categoria:
-        productos_filtrados = [p for p in productos_filtrados if p.get('categoria', '').lower() == categoria.lower()]
+        productos_filtrados = [
+            p for p in productos_filtrados
+            if p.get('categoria', '').lower() == categoria.lower()
+        ]
 
     if stock:
         stock_filters = {
@@ -122,7 +410,9 @@ def aplicar_filtros_adicionales(productos, oficina, categoria, stock):
             'sin': lambda p: p.get('cantidad', 0) == 0
         }
         if stock in stock_filters:
-            productos_filtrados = [p for p in productos_filtrados if stock_filters[stock](p)]
+            productos_filtrados = [
+                p for p in productos_filtrados if stock_filters[stock](p)
+            ]
 
     return productos_filtrados
 
@@ -139,26 +429,27 @@ def preparar_oficinas_filtradas(tipo, oficinas_db):
             {'nombre': of['nombre']} for of in oficinas_db if of['nombre'] != 'Sede Principal'
         ]
 
+
 # ==========================================================
 # VISTAS FILTRADAS
 # ==========================================================
 @inventario_corporativo_bp.route('/inventario-corporativo/sede-principal')
 def inventario_corporativo_sede_principal():
-    if 'usuario_id' not in session:
+    if not _require_login():
         return redirect('/login')
     return listar_inventario_corporativo_filtrado('sede')
 
 
 @inventario_corporativo_bp.route('/inventario-corporativo/oficinas-servicio')
 def inventario_corporativo_oficinas_servicio():
-    if 'usuario_id' not in session:
+    if not _require_login():
         return redirect('/login')
     return listar_inventario_corporativo_filtrado('oficinas')
 
 
 @inventario_corporativo_bp.route('/inventario-corporativo/filtrado/<tipo>')
 def listar_inventario_corporativo_filtrado(tipo):
-    if 'usuario_id' not in session:
+    if not _require_login():
         return redirect('/login')
 
     rol = session.get('rol', '')
@@ -194,14 +485,25 @@ def listar_inventario_corporativo_filtrado(tipo):
         }.get(tipo, {})
 
         productos = [p for p in productos if config['filtro'](p)]
-        productos_filtrados = aplicar_filtros_adicionales(productos, filtro_oficina, filtro_categoria, filtro_stock)
+        productos_filtrados = aplicar_filtros_adicionales(
+            productos,
+            filtro_oficina,
+            filtro_categoria,
+            filtro_stock
+        )
 
         total_productos = len(productos_filtrados)
-        valor_total = sum(p.get('valor_unitario', 0) * p.get('cantidad', 0) for p in productos_filtrados)
-        productos_bajo_stock = len([p for p in productos_filtrados if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)])
+        valor_total = sum(
+            p.get('valor_unitario', 0) * p.get('cantidad', 0)
+            for p in productos_filtrados
+        )
+        productos_bajo_stock = len([
+            p for p in productos_filtrados
+            if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)
+        ])
 
         oficinas_filtradas = preparar_oficinas_filtradas(tipo, oficinas_db)
-        categorias = [{'nombre': cat.get('nombre_categoria', '')} for cat in categorias_db]
+        categorias = [{'nombre': cat.get('nombre', '')} for cat in categorias_db]
 
         return render_template(
             'inventario_corporativo/listar_con_filtros.html',
@@ -224,12 +526,13 @@ def listar_inventario_corporativo_filtrado(tipo):
         flash('Error al cargar el inventario corporativo', 'danger')
         return render_template('inventario_corporativo/listar_con_filtros.html', productos=[])
 
+
 # ==========================================================
 # EXPORTAR INVENTARIO A EXCEL
 # ==========================================================
 @inventario_corporativo_bp.route('/inventario-corporativo/exportar/excel/<tipo>')
 def exportar_inventario_corporativo_excel(tipo):
-    if 'usuario_id' not in session:
+    if not _require_login():
         return redirect('/login')
 
     try:
@@ -240,15 +543,26 @@ def exportar_inventario_corporativo_excel(tipo):
         productos = InventarioCorporativoModel.obtener_todos_con_oficina() or []
 
         if tipo == 'sede':
-            productos = [p for p in productos if p.get('oficina', 'Sede Principal') == 'Sede Principal']
+            productos = [
+                p for p in productos
+                if p.get('oficina', 'Sede Principal') == 'Sede Principal'
+            ]
             sheet_name = 'Sede Principal'
         elif tipo == 'oficinas':
-            productos = [p for p in productos if p.get('oficina', 'Sede Principal') != 'Sede Principal']
+            productos = [
+                p for p in productos
+                if p.get('oficina', 'Sede Principal') != 'Sede Principal'
+            ]
             sheet_name = 'Oficinas Servicio'
         else:
             sheet_name = 'Inventario Completo'
 
-        productos = aplicar_filtros_adicionales(productos, filtro_oficina, filtro_categoria, filtro_stock)
+        productos = aplicar_filtros_adicionales(
+            productos,
+            filtro_oficina,
+            filtro_categoria,
+            filtro_stock
+        )
 
         data = [{
             'Código': p.get('codigo_unico', ''),
@@ -281,20 +595,25 @@ def exportar_inventario_corporativo_excel(tipo):
         output.seek(0)
         filename = f"inventario_corporativo_{sheet_name.lower().replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
 
-        return send_file(output, download_name=filename, as_attachment=True,
-                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        return send_file(
+            output,
+            download_name=filename,
+            as_attachment=True,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
 
     except Exception as e:
         print(f"❌ Error exportando a Excel: {e}")
         flash('Error al exportar el archivo Excel', 'danger')
         return redirect(request.referrer or '/inventario-corporativo')
 
+
 # ==========================================================
 # API ESTADÍSTICAS
 # ==========================================================
 @inventario_corporativo_bp.route('/api/inventario-corporativo/estadisticas')
 def api_estadisticas_inventario_corporativo():
-    if 'usuario_id' not in session:
+    if not _require_login():
         return jsonify({'error': 'No autorizado'}), 401
 
     try:
@@ -311,36 +630,3 @@ def api_estadisticas_inventario_corporativo():
     except Exception as e:
         print(f"❌ Error obteniendo estadísticas: {e}")
         return jsonify({'error': 'Error interno del servidor'}), 500
-
-# ==========================================================
-# RUTAS FALTANTES - PARA EVITAR ERRORES EN PLANTILLAS
-# ==========================================================
-@inventario_corporativo_bp.route('/inventario-corporativo/reportes')
-def reportes_inventario_corporativo():
-    """Ruta temporal para evitar errores en plantillas"""
-    flash('Módulo de reportes en desarrollo', 'info')
-    return redirect('/inventario-corporativo')
-
-@inventario_corporativo_bp.route('/inventario-corporativo/ver/<int:producto_id>')
-def ver_producto_corporativo(producto_id):
-    """Ruta temporal para evitar errores en plantillas"""
-    flash('Funcionalidad de ver producto en desarrollo', 'info')
-    return redirect('/inventario-corporativo')
-
-@inventario_corporativo_bp.route('/inventario-corporativo/editar/<int:producto_id>')
-def editar_producto_corporativo(producto_id):
-    """Ruta temporal para evitar errores en plantillas"""
-    flash('Funcionalidad de editar producto en desarrollo', 'info')
-    return redirect('/inventario-corporativo')
-
-@inventario_corporativo_bp.route('/inventario-corporativo/asignar/<int:producto_id>')
-def asignar_producto_corporativo(producto_id):
-    """Ruta temporal para evitar errores en plantillas"""
-    flash('Funcionalidad de asignar producto en desarrollo', 'info')
-    return redirect('/inventario-corporativo')
-
-@inventario_corporativo_bp.route('/inventario-corporativo/eliminar/<int:producto_id>', methods=['POST'])
-def eliminar_producto_corporativo(producto_id):
-    """Ruta temporal para evitar errores en plantillas"""
-    flash('Funcionalidad de eliminar producto en desarrollo', 'info')
-    return redirect('/inventario-corporativo')

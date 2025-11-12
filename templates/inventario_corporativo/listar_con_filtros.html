@@ -1,6 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Inventario Corporativo - Sistema de Gestión{% endblock %}
+
+{% block title %}
+Inventario Corporativo - Sistema de Gestión
+{% endblock %}
+
 {% block content %}
+{# Obtener el rol desde la sesión, con manejo de espacios y mayúsculas #}
+{% set rol_raw = session.get('rol', '') %}
+{% set rol = (rol_raw or 'usuario')|lower|trim %}
+
+{# Determinar si el usuario tiene permisos de gestión #}
+{% set puede_gestionar = rol in ['administrador', 'lider_inventario', 'admin'] %}
+
 <div class="container-fluid fade-in">
     <!-- Encabezado -->
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -15,9 +26,12 @@
             <button class="btn btn-outline-secondary" disabled title="Próximamente">
                 <i class="fas fa-chart-bar"></i> Reportes
             </button>
-            <a href="{{ url_for('inventario_corporativo.crear_inventario_corporativo') }}" class="btn btn-primary">
+            {% if puede_gestionar %}
+            <!-- ✅ Ruta directa que sí existe en las rutas -->
+            <a href="/inventario-corporativo/crear" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Nuevo Producto
             </a>
+            {% endif %}
         </div>
     </div>
 
@@ -28,9 +42,10 @@
                 <div class="col-md-3">
                     <label class="form-label fw-semibold">Filtrar por Oficina</label>
                     <select name="oficina" class="form-select">
-                         {% for oficina in oficinas_filtradas %}
+                        <option value="">Todas las oficinas</option>
+                        {% for oficina in oficinas_filtradas %}
                         <option value="{{ oficina.nombre }}" {% if filtro_oficina==oficina.nombre %}selected{% endif %}>
-                           {{ oficina.nombre }}
+                            {{ oficina.nombre }}
                         </option>
                         {% endfor %}
                     </select>
@@ -69,7 +84,13 @@
                     {% if filtro_oficina %}<span class="badge bg-primary">{{ filtro_oficina }}</span>{% endif %}
                     {% if filtro_categoria %}<span class="badge bg-secondary">{{ filtro_categoria }}</span>{% endif %}
                     {% if filtro_stock %}<span class="badge bg-info">{{ filtro_stock|title }}</span>{% endif %}
-                    <a href="{{ url_for('inventario_corporativo.listar_inventario_corporativo_filtrado', tipo=tipo) }}" class="btn btn-sm btn-outline-danger ms-2">
+                    <!-- ✅ Limpiar filtros: vuelve a la ruta correcta según tipo -->
+                    <a href="{{ '/inventario-corporativo/sede-principal' 
+                               if tipo=='sede_principal' 
+                               else '/inventario-corporativo/oficinas-servicio' 
+                               if tipo=='oficinas_servicio' 
+                               else '/inventario-corporativo' }}"
+                       class="btn btn-sm btn-outline-danger ms-2">
                         <i class="fas fa-times"></i> Limpiar
                     </a>
                 </small>
@@ -120,6 +141,7 @@
             <span class="text-muted">Mostrando {{ productos|length }} de {{ total_productos }} productos</span>
         </div>
         <div>
+            {# Dejamos el export tal como lo tenías, asumiendo que la ruta existe en tu blueprint original #}
             <a href="{{ url_for('inventario_corporativo.exportar_inventario_corporativo_excel', tipo=tipo) }}?oficina={{ filtro_oficina }}&categoria={{ filtro_categoria }}&stock={{ filtro_stock }}"
                class="btn btn-success">
                 <i class="fas fa-file-excel"></i> Exportar a Excel
@@ -143,11 +165,12 @@
                             <th>Ubicación</th>
                             <th>Oficina</th>
                             <th>Asignable</th>
+                            {% if puede_gestionar %}
                             <th style="white-space:nowrap;">Acciones</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
-                        {% set rol = (session.get('rol','usuario') or 'usuario')|lower|trim %}
                         {% for producto in productos %}
                         <tr>
                             <td><strong>{{ producto.codigo_unico }}</strong></td>
@@ -195,34 +218,45 @@
                                 <span class="badge bg-secondary">No</span>
                                 {% endif %}
                             </td>
+                            {% if puede_gestionar %}
                             <td style="white-space:nowrap;">
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <!-- Botones temporalmente deshabilitados -->
-                                    <button class="btn btn-outline-primary" disabled title="Próximamente">
+                                    <!-- Ver detalle: ruta que ya existe -->
+                                    <a href="/inventario-corporativo/{{ producto.id }}" 
+                                       class="btn btn-outline-primary" title="Ver detalles">
                                         <i class="fas fa-eye"></i>
-                                    </button>
+                                    </a>
 
-                                    {% if rol in ['administrador','lider_inventario'] %}
-                                    <button class="btn btn-outline-warning" disabled title="Próximamente">
+                                    <!-- Editar: ruta /inventario-corporativo/editar/<id> -->
+                                    <a href="/inventario-corporativo/editar/{{ producto.id }}" 
+                                       class="btn btn-outline-warning" title="Editar producto">
                                         <i class="fas fa-edit"></i>
-                                    </button>
+                                    </a>
 
+                                    <!-- Asignar (solo si es asignable) -->
                                     {% if producto.es_asignable %}
-                                    <button class="btn btn-outline-success" disabled title="Próximamente">
+                                    <a href="/inventario-corporativo/asignar/{{ producto.id }}" 
+                                       class="btn btn-outline-success" title="Asignar producto">
                                         <i class="fas fa-share-square"></i>
-                                    </button>
+                                    </a>
                                     {% endif %}
 
-                                    <button class="btn btn-outline-danger" disabled title="Próximamente">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    {% endif %}
+                                    <!-- Eliminar: POST a ruta /inventario-corporativo/eliminar/<id> -->
+                                    <form method="POST" 
+                                          action="/inventario-corporativo/eliminar/{{ producto.id }}" 
+                                          class="d-inline"
+                                          onsubmit="return confirm('¿Está seguro de que desea eliminar este producto?');">
+                                        <button type="submit" class="btn btn-outline-danger" title="Eliminar producto">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
+                            {% endif %}
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="10" class="text-center text-muted py-4">
+                            <td colspan="{% if puede_gestionar %}10{% else %}9{% endif %}" class="text-center text-muted py-4">
                                 <i class="fas fa-inbox fa-2x mb-2"></i><br>
                                 No hay productos registrados
                             </td>
