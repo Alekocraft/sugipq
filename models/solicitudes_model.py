@@ -44,7 +44,6 @@ class SolicitudModel:
         cursor = conn.cursor()
         try:
             aprobador_id = SolicitudModel._obtener_aprobador_id(usuario_aprobador_id)
-            # NOTA: El SP original en bd.txt NO recibe email, así que lo eliminamos
             cursor.execute(
                 "{CALL sp_AprobarSolicitud (?, ?)}",
                 (solicitud_id, aprobador_id)
@@ -66,7 +65,6 @@ class SolicitudModel:
 
     @staticmethod
     def aprobar_parcial(solicitud_id, usuario_aprobador_id, cantidad_aprobada):
-        # Aprobación completa + entrega parcial
         success, msg = SolicitudModel.aprobar(solicitud_id, usuario_aprobador_id)
         if not success:
             return False, msg
@@ -114,24 +112,26 @@ class SolicitudModel:
             cursor.close()
             conn.close()
 
+    # ✅ MODIFICADO: Ahora acepta oficina_id opcional
     @staticmethod
-    def obtener_todas():
-        return SolicitudModel.obtener_todas_ordenadas()
+    def obtener_todas(oficina_id=None):
+        return SolicitudModel.obtener_todas_ordenadas(oficina_id)
 
+    # ✅ MODIFICADO: Consulta filtrada por oficina
     @staticmethod
-    def obtener_para_aprobador():
+    def obtener_para_aprobador(oficina_id=None):
         conn = get_database_connection()
         if conn is None:
             return []
         cursor = conn.cursor()
         try:
-            cursor.execute("""
+            sql = """
                 SELECT 
                     sm.SolicitudId,
                     m.NombreElemento,
                     sm.UsuarioSolicitante,
                     o.NombreOficina,
-                    sm.OficinaSolicitanteId,  -- ✅ Incluido
+                    sm.OficinaSolicitanteId,
                     sm.CantidadSolicitada,
                     es.NombreEstado,
                     sm.FechaSolicitud,
@@ -149,8 +149,12 @@ class SolicitudModel:
                 INNER JOIN dbo.Oficinas o ON sm.OficinaSolicitanteId = o.OficinaId
                 INNER JOIN dbo.EstadosSolicitud es ON sm.EstadoId = es.EstadoId
                 WHERE sm.EstadoId = 1
-                ORDER BY sm.FechaSolicitud DESC
-            """)
+            """
+            if oficina_id:
+                sql += " AND sm.OficinaSolicitanteId = ?"
+                cursor.execute(sql, (oficina_id,))
+            else:
+                cursor.execute(sql)
             return SolicitudModel._mapear_solicitudes(cursor.fetchall())
         except Exception as e:
             print(f"Error en obtener_para_aprobador: {e}")
@@ -159,20 +163,21 @@ class SolicitudModel:
             cursor.close()
             conn.close()
 
+    # ✅ MODIFICADO: Consulta con orden y filtro opcional por oficina
     @staticmethod
-    def obtener_todas_ordenadas():
+    def obtener_todas_ordenadas(oficina_id=None):
         conn = get_database_connection()
         if conn is None:
             return []
         cursor = conn.cursor()
         try:
-            cursor.execute("""
+            sql = """
                 SELECT 
                     sm.SolicitudId,
                     m.NombreElemento,
                     sm.UsuarioSolicitante,
                     o.NombreOficina,
-                    sm.OficinaSolicitanteId,  -- ✅ Incluido
+                    sm.OficinaSolicitanteId,
                     sm.CantidadSolicitada,
                     es.NombreEstado,
                     sm.FechaSolicitud,
@@ -189,6 +194,10 @@ class SolicitudModel:
                 INNER JOIN dbo.Materiales m ON sm.MaterialId = m.MaterialId
                 INNER JOIN dbo.Oficinas o ON sm.OficinaSolicitanteId = o.OficinaId
                 INNER JOIN dbo.EstadosSolicitud es ON sm.EstadoId = es.EstadoId
+            """
+            if oficina_id:
+                sql += " WHERE sm.OficinaSolicitanteId = ?"
+            sql += """
                 ORDER BY 
                     CASE es.NombreEstado 
                         WHEN 'Pendiente' THEN 1
@@ -197,7 +206,11 @@ class SolicitudModel:
                         ELSE 4
                     END,
                     sm.FechaSolicitud DESC
-            """)
+            """
+            if oficina_id:
+                cursor.execute(sql, (oficina_id,))
+            else:
+                cursor.execute(sql)
             return SolicitudModel._mapear_solicitudes(cursor.fetchall())
         except Exception as e:
             print(f"Error en obtener_todas_ordenadas: {e}")
@@ -215,9 +228,9 @@ class SolicitudModel:
                 'material_nombre': row[1],
                 'usuario_solicitante': row[2],
                 'oficina_nombre': row[3],
-                'oficina_id': row[4],  # ✅ Ahora sí está
+                'oficina_id': row[4],
                 'cantidad_solicitada': row[5],
-                'estado': row[6],  # Ej: "Pendiente", "Aprobada", etc.
+                'estado': row[6],
                 'fecha_solicitud': row[7],
                 'observacion': row[8] or '',
                 'material_id': row[9],

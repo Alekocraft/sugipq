@@ -2,14 +2,15 @@
 
 class MaterialModel:
     @staticmethod
-    def obtener_todos():
+    def obtener_todos(oficina_id=None):
+        """Obtiene todos los materiales, opcionalmente filtrados por oficina"""
         conn = get_database_connection()
         if conn is None:
             return []
         cursor = conn.cursor()
         try:
-            # CONSULTA CORREGIDA - SOLO CAMPOS QUE EXISTEN
-            cursor.execute("""
+            # CONSULTA BASE
+            sql = """
                 SELECT 
                     MaterialId, 
                     NombreElemento, 
@@ -22,9 +23,18 @@ class MaterialModel:
                     UsuarioCreador, 
                     RutaImagen
                 FROM Materiales 
-                WHERE Activo = 1 
-                ORDER BY MaterialId DESC
-            """)
+                WHERE Activo = 1
+            """
+            
+            # FILTRO OPCIONAL POR OFICINA
+            params = ()
+            if oficina_id:
+                sql += " AND OficinaCreadoraId = ?"
+                params = (oficina_id,)
+
+            sql += " ORDER BY MaterialId DESC"
+            cursor.execute(sql, params)
+
             materiales = []
             for row in cursor.fetchall():
                 material = {
@@ -38,7 +48,7 @@ class MaterialModel:
                     'fecha_creacion': row[7],
                     'usuario_creador': row[8],
                     'ruta_imagen': row[9],
-                    'cantidad_minima': 10  # VALOR FIJO POR DEFECTO
+                    'cantidad_minima': 10  # Valor por defecto
                 }
                 materiales.append(material)
             return materiales
@@ -56,7 +66,6 @@ class MaterialModel:
             return None
         cursor = conn.cursor()
         try:
-            # CONSULTA CORREGIDA - SOLO CAMPOS QUE EXISTEN
             cursor.execute("""
                 SELECT 
                     MaterialId, 
@@ -91,7 +100,7 @@ class MaterialModel:
                     'fecha_creacion': row[7],
                     'usuario_creador': row[8],
                     'ruta_imagen': ruta_imagen if ruta_imagen and ruta_imagen != 'None' else None,
-                    'cantidad_minima': 10  # VALOR FIJO POR DEFECTO
+                    'cantidad_minima': 10
                 }
             return None
         except Exception as e:
@@ -109,7 +118,6 @@ class MaterialModel:
             return None
         cursor = conn.cursor()
         try:
-            # Validaciones basicas
             if not nombre or nombre.strip() == '':
                 print("Nombre vacio")
                 return None
@@ -120,27 +128,14 @@ class MaterialModel:
                 print("Cantidad invalida")
                 return None
         
-            print(f"INSERTANDO MATERIAL EN BD:")
-            print(f"   - Nombre: {nombre}")
-            print(f"   - Valor: {valor_unitario}")
-            print(f"   - Cantidad: {cantidad}")
-            print(f"   - Oficina: {oficina_id}")
-            print(f"   - RutaImagen recibida: '{ruta_imagen}'")
-        
-            # MANEJO CORRECTO DE LA RUTA DE IMAGEN - FORZAR STRING
             ruta_imagen_final = str(ruta_imagen).strip() if ruta_imagen else None
-            print(f"   - Imagen a guardar: '{ruta_imagen_final}'")
         
-            # VERIFICAR QUE LA OFICINA EXISTE
             cursor.execute("SELECT COUNT(*) FROM Oficinas WHERE OficinaId = ?", (oficina_id,))
             oficina_exists = cursor.fetchone()[0]
-            print(f"Oficina existe: {oficina_exists}")
-            
             if oficina_exists == 0:
                 print("La oficina no existe")
                 return None
         
-            # SQL DE INSERCION SIN CantidadMinima (usa el valor por defecto de la BD)
             sql = """
                 INSERT INTO Materiales (
                     NombreElemento, 
@@ -154,9 +149,6 @@ class MaterialModel:
                 ) 
                 VALUES (?, ?, ?, ?, 1, GETDATE(), ?, ?)
             """
-        
-            print("Ejecutando INSERT...")
-            # EJECUCION DIRECTA CON PARAMETROS
             params = (
                 str(nombre), 
                 float(valor_unitario), 
@@ -165,55 +157,22 @@ class MaterialModel:
                 str(usuario_creador), 
                 ruta_imagen_final
             )
-            print(f"Parametros: {params}")
             
             cursor.execute(sql, params)
-            affected = cursor.rowcount
-            print(f"INSERT ejecutado - filas afectadas: {affected}")
-            
             conn.commit()
-            print("Commit realizado")
-        
-            # OBTENER EL ID DEL MATERIAL CREADO
+            
             cursor.execute("SELECT MAX(MaterialId) FROM Materiales")
             max_row = cursor.fetchone()
-            
             if max_row and max_row[0] is not None:
                 material_id = int(max_row[0])
-                print(f"MATERIAL CREADO EXITOSAMENTE - ID: {material_id}")
-                
-                # VERIFICACION FINAL DESPUES DEL COMMIT
-                cursor.execute("""
-                    SELECT MaterialId, NombreElemento, RutaImagen
-                    FROM Materiales 
-                    WHERE MaterialId = ?
-                """, (material_id,))
-                verif_row = cursor.fetchone()
-                
-                if verif_row:
-                    id_verif, nombre_verif, ruta_verif = verif_row
-                    print(f"VERIFICACION FINAL EN BD:")
-                    print(f"   - ID: {id_verif}")
-                    print(f"   - Nombre: {nombre_verif}")
-                    print(f"   - RutaImagen: '{ruta_verif}'")
-                    print(f"   - Tipo RutaImagen: {type(ruta_verif)}")
-                    
-                    # CONFIRMAR QUE LA RUTA NO SEA NULL
-                    if ruta_verif is not None:
-                        print(f"IMAGEN GUARDADA CORRECTAMENTE: '{ruta_verif}'")
-                    
-                    return material_id
-                else:
-                    print("El material no se encontro despues de crearlo")
-                    return None
+                return material_id
             else:
-                print("NO SE PUDO OBTENER ID DEL MATERIAL")
+                print("No se pudo obtener el ID del material creado")
                 return None
-                
         except Exception as e:
             print(f"ERROR CRITICO en MaterialModel.crear: {str(e)}")
             import traceback
-            print(f"TRACEBACK COMPLETO: {traceback.format_exc()}")
+            print(traceback.format_exc())
             conn.rollback()
             return None
         finally:
@@ -256,23 +215,20 @@ class MaterialModel:
 
     @staticmethod
     def actualizar_imagen(material_id, ruta_imagen):
-        """Metodo especifico para actualizar solo la imagen"""
+        """Actualiza solo la imagen de un material"""
         conn = get_database_connection()
         if conn is None:
             print("No se pudo establecer conexion a la base de datos")
             return False
         cursor = conn.cursor()
         try:
-            print(f"Actualizando imagen para material {material_id}: '{ruta_imagen}'")
             cursor.execute("""
                 UPDATE Materiales 
                 SET RutaImagen = ?
                 WHERE MaterialId = ?
             """, (ruta_imagen, material_id))
-            
             affected = cursor.rowcount
             conn.commit()
-            print(f"Imagen actualizada - filas afectadas: {affected}")
             return affected > 0
         except Exception as e:
             print(f"Error al actualizar imagen: {e}")

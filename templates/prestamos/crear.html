@@ -8,9 +8,11 @@
             <i class="fas fa-plus"></i> Nuevo Préstamo de Elemento Publicitario
         </h1>
         <div class="d-flex gap-2">
+            {% if can_access('materiales', 'create') %}
             <a href="/prestamos/elementos/crearmaterial" class="btn btn-outline-primary">
                 <i class="fas fa-plus-square"></i> Crear Elemento
             </a>
+            {% endif %}
             <a href="/prestamos" class="btn btn-outline-secondary">
                 <i class="fas fa-arrow-left"></i> Volver
             </a>

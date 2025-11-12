@@ -4,7 +4,7 @@ from models.solicitudes_model import SolicitudModel
 from models.materiales_model import MaterialModel
 from models.oficinas_model import OficinaModel
 from utils.filters import filtrar_por_oficina_usuario, verificar_acceso_oficina
-
+from utils.permissions import can_access  # ✅ NUEVO IMPORT
 
 # Crear blueprint de solicitudes
 solicitudes_bp = Blueprint('solicitudes', __name__, url_prefix='/solicitudes')
@@ -17,10 +17,17 @@ def _has_role(*roles):
     rol = (session.get('rol', '') or '').strip().lower()
     return rol in [r.lower() for r in roles]
 
+# ✅ CORREGIDO: ruta base del blueprint ahora es '/'
 @solicitudes_bp.route('/')
 def listar_solicitudes():
+    # Verificación de sesión
     if not _require_login():
         return redirect('/login')
+
+    # ✅ USAR EL SISTEMA DE PERMISOS CENTRALIZADO
+    if not can_access('solicitudes', 'view'):
+        flash('No tienes permisos para ver el listado de solicitudes', 'danger')
+        return redirect('/dashboard')
 
     # ✅ Todos EXCEPTO tesoreria
     rol = session.get('rol', '')
@@ -71,30 +78,34 @@ def listar_solicitudes():
         if filtro_oficina != 'todas':
             solicitudes_filtradas = [s for s in solicitudes_filtradas if s.get('oficina_nombre', '') == filtro_oficina]
 
-        return render_template('solicitudes/solicitudes.html',
-                             solicitudes=solicitudes_filtradas,
-                             materiales_dict=materiales_dict,
-                             oficinas_unique=oficinas_unique,
-                             total_solicitudes=total_solicitudes,
-                             solicitudes_pendientes=solicitudes_pendientes,
-                             solicitudes_aprobadas=solicitudes_aprobadas,
-                             solicitudes_rechazadas=solicitudes_rechazadas,
-                             filtro_estado=filtro_estado,
-                             filtro_oficina=filtro_oficina)
-                             
+        return render_template(
+            'solicitudes/solicitudes.html',
+            solicitudes=solicitudes_filtradas,
+            materiales_dict=materiales_dict,
+            oficinas_unique=oficinas_unique,
+            total_solicitudes=total_solicitudes,
+            solicitudes_pendientes=solicitudes_pendientes,
+            solicitudes_aprobadas=solicitudes_aprobadas,
+            solicitudes_rechazadas=solicitudes_rechazadas,
+            filtro_estado=filtro_estado,
+            filtro_oficina=filtro_oficina
+        )
+
     except Exception as e:
         print(f"❌ Error obteniendo solicitudes: {e}")
         flash('Error al cargar las solicitudes', 'danger')
-        return render_template('solicitudes/solicitudes.html', 
-                             solicitudes=[],
-                             materiales_dict={},
-                             oficinas_unique=[],
-                             total_solicitudes=0,
-                             solicitudes_pendientes=0,
-                             solicitudes_aprobadas=0,
-                             solicitudes_rechazadas=0,
-                             filtro_estado='todos',
-                             filtro_oficina='todas')
+        return render_template(
+            'solicitudes/solicitudes.html',
+            solicitudes=[],
+            materiales_dict={},
+            oficinas_unique=[],
+            total_solicitudes=0,
+            solicitudes_pendientes=0,
+            solicitudes_aprobadas=0,
+            solicitudes_rechazadas=0,
+            filtro_estado='todos',
+            filtro_oficina='todas'
+        )
 
 @solicitudes_bp.route('/crear', methods=['GET'])
 def mostrar_formulario_solicitud():
@@ -115,8 +126,7 @@ def mostrar_formulario_solicitud():
 
         print(f"✅ Materiales cargados para formulario: {len(materiales)}")
 
-        return render_template('solicitudes/crear.html', 
-                             materiales=materiales)
+        return render_template('solicitudes/crear.html', materiales=materiales)
     except Exception as e:
         print(f"Error al cargar formulario: {e}")
         flash('Error al cargar el formulario', 'error')

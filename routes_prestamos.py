@@ -1,5 +1,8 @@
 ﻿# routes_prestamos.py
-from flask import Blueprint, render_template, request, redirect, session, flash, send_file, url_for, jsonify
+from flask import (
+    Blueprint, render_template, request, redirect, session, flash,
+    send_file, url_for, jsonify, current_app
+)
 from datetime import datetime
 from decimal import Decimal
 from io import BytesIO
@@ -29,7 +32,7 @@ from database import get_database_connection  # mantener como en el resto del pr
 bp_prestamos = Blueprint('prestamos', __name__, url_prefix='/prestamos')
 
 # ==========================================================
-# Helpers de sesión / permisos (no endurecemos para no romper)
+# Helpers de sesión / permisos
 # ==========================================================
 def _require_login():
     return 'usuario_id' in session
@@ -37,6 +40,35 @@ def _require_login():
 def _has_role(*roles):
     rol = (session.get('rol', '') or '').strip().lower()
     return rol in [r.lower() for r in roles]
+
+# ==========================================================
+# Helpers de imágenes (detección de columna y normalización URL)
+# ==========================================================
+IMG_COLS = ["RutaImagen", "ImagenURL", "ImagenUrl", "Imagen", "FotoURL", "FotoUrl", "Foto"]
+
+def _detect_image_column(cur):
+    """Detecta la primera columna de imagen disponible en ElementosPublicitarios."""
+    cur.execute("SELECT TOP 1 * FROM dbo.ElementosPublicitarios")
+    col_names = [d[0] for d in cur.description]
+    for c in IMG_COLS:
+        if c in col_names:
+            return c
+    return None
+
+def _normalize_image_url(path_value: str) -> str:
+    """Normaliza valores de imagen a una URL servible por Flask static."""
+    if not path_value:
+        return ""
+    if isinstance(path_value, str) and path_value.startswith('http'):
+        return path_value
+    # si viene 'static/...' o relativo al static
+    if isinstance(path_value, str) and path_value.startswith('static/'):
+        rel = path_value.replace('static/', '')
+        return url_for('static', filename=rel)
+    if isinstance(path_value, str):
+        # asumimos que es relativo a static_folder
+        return url_for('static', filename=path_value)
+    return ""
 
 # ==========================================================
 # Consultas (USANDO SOLO dbo.PrestamosElementos + ElementosPublicitarios)
@@ -63,14 +95,8 @@ def _fetch_estados_distintos():
         except:
             pass
 
-def _fetch_prestamos(estado=None):
-    """
-    Lista préstamos uniendo con ElementosPublicitarios para:
-    - Material (NombreElemento)
-    - ValorUnitario
-    - Subtotal = CantidadPrestada * ValorUnitario
-    Y con Usuarios y Oficinas para nombres
-    """
+def _fetch_prestamos(estado=None, oficina_id=None):
+    """Lista préstamos con filtro opcional por estado y oficina."""
     conn = cur = None
     rows_out = []
     try:
@@ -100,6 +126,11 @@ def _fetch_prestamos(estado=None):
             WHERE pe.Activo = 1
         """
         params = []
+        
+        if oficina_id:
+            sql += " AND pe.OficinaId = ?"
+            params.append(oficina_id)
+        
         if estado and estado.strip():
             sql += " AND pe.Estado = ?"
             params.append(estado.strip())
@@ -111,14 +142,13 @@ def _fetch_prestamos(estado=None):
 
         for r in rows:
             id_ = r[0]
-            material = r[2]
             valor_unit = r[3] or 0
             cant = r[4] or 0
             subtotal = Decimal(valor_unit) * Decimal(cant)
             rows_out.append({
                 'id': id_,
                 'elemento_id': r[1],
-                'material': material,
+                'material': r[2],
                 'valor_unitario': Decimal(valor_unit),
                 'cantidad': int(cant),
                 'subtotal': subtotal,
@@ -200,14 +230,20 @@ def _fetch_detalle(prestamo_id: int):
 
 # ==========================================================
 # Rutas: Listar + Filtro + Export (Excel/PDF)
+# (ÚNICA VERSIÓN para evitar conflictos)
 # ==========================================================
 @bp_prestamos.get('/')
-def listar():
+def listar_prestamos():
     if not _require_login():
         return redirect('/login')
 
     estado = request.args.get('estado', '').strip() or None
-    prestamos = _fetch_prestamos(estado)
+    
+    # Filtro de oficina según permisos
+    from utils.permissions import user_can_view_all
+    oficina_id = None if user_can_view_all() else session.get('oficina_id')
+    
+    prestamos = _fetch_prestamos(estado, oficina_id)
     estados = _fetch_estados_distintos()
 
     return render_template(
@@ -224,7 +260,12 @@ def exportar():
 
     estado = request.args.get('estado', '').strip() or None
     fmt = (request.args.get('fmt', 'xlsx') or 'xlsx').lower()  # 'xlsx' | 'pdf'
-    data = _fetch_prestamos(estado)
+
+    # Respetar filtro de oficina
+    from utils.permissions import user_can_view_all
+    oficina_id = None if user_can_view_all() else session.get('oficina_id')
+
+    data = _fetch_prestamos(estado, oficina_id)
 
     rows = [{
         'PrestamoId': d['id'],
@@ -232,19 +273,18 @@ def exportar():
         'CantidadPrestada': d['cantidad'],
         'ValorUnitario': float(d['valor_unitario']),
         'Subtotal': float(d['subtotal']),
-        'Solicitante': d['solicitante_nombre'],  # Cambiado
-        'Oficina': d['oficina_nombre'],          # Cambiado
+        'Solicitante': d['solicitante_nombre'],
+        'Oficina': d['oficina_nombre'],
         'FechaPrestamo': d['fecha'],
         'FechaDevolucionPrevista': d['fecha_prevista'],
         'Estado': d['estado'],
         'Observaciones': d['observaciones'],
     } for d in data]
 
-    # El resto del código de exportación permanece igual...
     if fmt == 'xlsx':
         if not HAS_PANDAS:
             flash('Exportar a Excel requiere pandas y openpyxl. Instálalos o usa PDF.', 'warning')
-            return redirect(url_for('prestamos.listar', estado=estado or ''))
+            return redirect(url_for('prestamos.listar_prestamos', estado=estado or ''))
 
         df = pd.DataFrame(rows)
         buf = BytesIO()
@@ -263,7 +303,7 @@ def exportar():
     if fmt == 'pdf':
         if not HAS_REPORTLAB:
             flash('Exportar a PDF requiere reportlab.', 'warning')
-            return redirect(url_for('prestamos.listar', estado=estado or ''))
+            return redirect(url_for('prestamos.listar_prestamos', estado=estado or ''))
 
         buf = BytesIO()
         doc = SimpleDocTemplate(
@@ -294,7 +334,10 @@ def exportar():
             ]
             for d in rows
         ]
-        table = Table([headers] + body, colWidths=[1.2*cm, 6.5*cm, 1.2*cm, 2*cm, 2.4*cm, 2.2*cm, 2.0*cm, 3*cm, 3*cm, 2.5*cm])
+        table = Table(
+            [headers] + body,
+            colWidths=[1.2*cm, 6.5*cm, 1.2*cm, 2*cm, 2.4*cm, 2.2*cm, 2.0*cm, 3*cm, 3*cm, 2.5*cm]
+        )
         table.setStyle(TableStyle([
             ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#e9ecef')),
             ('TEXTCOLOR', (0,0), (-1,0), colors.black),
@@ -314,7 +357,7 @@ def exportar():
 
     # fallback
     flash('Formato no soportado. Usa fmt=xlsx o fmt=pdf', 'warning')
-    return redirect(url_for('prestamos.listar', estado=estado or ''))
+    return redirect(url_for('prestamos.listar_prestamos', estado=estado or ''))
 
 # ==========================================================
 # Rutas: Detalle (solo lectura)
@@ -326,7 +369,7 @@ def detalle(prestamo_id: int):
     data = _fetch_detalle(prestamo_id)
     if not data:
         flash('Préstamo no encontrado', 'warning')
-        return redirect(url_for('prestamos.listar'))
+        return redirect(url_for('prestamos.listar_prestamos'))
     return render_template('prestamos/detalle.html', p=data)
 
 # ==========================================================
@@ -336,16 +379,33 @@ def detalle(prestamo_id: int):
 def crear_elemento_publicitario_get():
     if not _require_login():
         return redirect('/login')
+    
+    # ✅ NUEVA VERIFICACIÓN: Restringir para oficina_cali
+    if _has_role('oficina_cali'):
+        flash('No tiene permisos para crear materiales publicitarios', 'danger')
+        return redirect('/prestamos')
+    
+    if not _has_role('administrador', 'lider_inventario'):
+        flash('No autorizado para crear materiales', 'danger')
+        return redirect('/prestamos')
+
     return render_template('prestamos/elemento_crear.html')
 
-# POST: /prestamos/elementos/crearmaterial
 @bp_prestamos.route('/elementos/crearmaterial', methods=['POST'], endpoint='crear_elemento_publicitario_post')
 def crear_elemento_publicitario_post():
     if not _require_login():
         return redirect('/login')
+    
+    # ✅ NUEVA VERIFICACIÓN: Restringir para oficina_cali
+    if _has_role('oficina_cali'):
+        flash('No tiene permisos para crear materiales publicitarios', 'danger')
+        return redirect('/prestamos')
+    
     if not _has_role('administrador', 'lider_inventario'):
         flash('No autorizado para crear materiales', 'danger')
         return redirect('/prestamos/elementos/crearmaterial')
+    
+    # ... resto del código ...
 
     nombre_elemento = (request.form.get('nombre_elemento') or '').strip()
     valor_unitario_str = request.form.get('valor_unitario', '0')
@@ -371,29 +431,26 @@ def crear_elemento_publicitario_post():
         flash('Complete nombre, valor (>0) y stock (>=0).', 'warning')
         return redirect('/prestamos/elementos/crearmaterial')
 
-    # Guardar imagen
+    # Guardar imagen en static/uploads/elementos
     ruta_imagen = None
     if imagen and imagen.filename:
         try:
             from werkzeug.utils import secure_filename
             import os
-            
             filename = secure_filename(imagen.filename)
-            project_root = os.path.dirname(os.path.abspath(__file__))
-            static_dir = os.path.join(project_root, 'static')
+            static_dir = current_app.static_folder  # más portable
             upload_dir = os.path.join(static_dir, 'uploads', 'elementos')
             os.makedirs(upload_dir, exist_ok=True)
-            
             file_path = os.path.join(upload_dir, filename)
             imagen.save(file_path)
-            ruta_imagen = f'static/uploads/elementos/{filename}'
-            
+            # Guardamos la ruta relativa al static, para normalizar luego con url_for('static', filename=...)
+            ruta_imagen = f'uploads/elementos/{filename}'
             print(f"✅ Imagen guardada: {ruta_imagen}")
         except Exception as e:
             print(f"❌ Error guardando imagen: {e}")
             flash('Error al guardar la imagen', 'warning')
 
-    # Calcular valor total (aunque sea columna calculada en BD, lo hacemos explícito para validación)
+    # Calcular valor total (para mensaje)
     valor_total = valor_unitario * cantidad_disp
 
     conn = cur = None
@@ -480,7 +537,6 @@ def crear_prestamo_get():
     oficina_nombre = session.get('oficina_nombre', '—')
 
     # Fecha mínima para el calendario (hoy)
-    from datetime import datetime, timedelta
     fecha_minima = datetime.now().strftime('%Y-%m-%d')
     
     # Cargar elementos activos
@@ -490,16 +546,8 @@ def crear_prestamo_get():
         conn = get_database_connection()
         cur = conn.cursor()
         
-        # Primero detectamos qué columna de imagen existe
-        cur.execute("SELECT TOP 1 * FROM dbo.ElementosPublicitarios")
-        col_names = [desc[0] for desc in cur.description]
-        img_col = None
-        for c in ["RutaImagen", "ImagenURL", "ImagenUrl", "Imagen", "FotoURL", "FotoUrl", "Foto"]:
-            if c in col_names:
-                img_col = c
-                break
+        img_col = _detect_image_column(cur)
 
-        # Consulta con la columna de imagen detectada
         if img_col:
             cur.execute(f"""
                 SELECT ElementoId, NombreElemento, ValorUnitario, CantidadDisponible, {img_col}
@@ -508,16 +556,7 @@ def crear_prestamo_get():
                 ORDER BY NombreElemento
             """)
             for (eid, nom, val, disp, img) in cur.fetchall():
-                # Construir la URL correcta para la imagen
-                imagen_url = ""
-                if img:
-                    if img.startswith('http'):
-                        imagen_url = img
-                    elif img.startswith('static/'):
-                        imagen_url = url_for('static', filename=img.replace('static/', ''))
-                    else:
-                        imagen_url = url_for('static', filename=img)
-                
+                imagen_url = _normalize_image_url(img)
                 elementos.append({
                     'id': eid,
                     'nombre': nom,
@@ -585,7 +624,7 @@ def crear_prestamo_post():
     if not fecha_prevista:
         flash('La fecha de devolución prevista es obligatoria', 'warning')
         return redirect('/prestamos/crear')
-    if not evento:  # NUEVA VALIDACIÓN
+    if not evento:
         flash('El evento/motivo del préstamo es obligatorio', 'warning')
         return redirect('/prestamos/crear')
     if not observaciones:
@@ -600,10 +639,10 @@ def crear_prestamo_post():
         conn = get_database_connection()
         cur = conn.cursor()
         
-        # Valida stock
+        # Valida stock (con hints para evitar sobre-préstamos en concurrencia)
         cur.execute("""
             SELECT CantidadDisponible, NombreElemento
-            FROM dbo.ElementosPublicitarios 
+            FROM dbo.ElementosPublicitarios WITH (UPDLOCK, ROWLOCK)
             WHERE ElementoId = ? AND Activo = 1
         """, (int(elemento_id),))
         row = cur.fetchone()
@@ -659,71 +698,10 @@ def crear_prestamo_post():
 
 # ==========================================================
 # API auxiliar: datos de un elemento (valor, disponible, imagen) para la UI
+# (ÚNICA VERSIÓN para evitar conflictos)
 # ==========================================================
 @bp_prestamos.get('/api/elemento/<int:elemento_id>')
-def api_elemento(elemento_id: int):
-    if not _require_login():
-        return jsonify({'ok': False, 'error': 'noauth'}), 401
-
-    conn = cur = None
-    try:
-        conn = get_database_connection()
-        cur = conn.cursor()
-        # detectar columna de imagen si existe
-        cur.execute("SELECT TOP 1 * FROM dbo.ElementosPublicitarios")
-        col_names = [d[0] for d in cur.description]
-        img_col = None
-        for c in ["ImagenURL", "ImagenUrl", "Imagen", "FotoURL", "FotoUrl", "Foto"]:
-            if c in col_names:
-                img_col = c
-                break
-
-        if img_col:
-            cur.execute(f"""
-                SELECT ElementoId, NombreElemento, ValorUnitario, CantidadDisponible, {img_col}
-                FROM dbo.ElementosPublicitarios
-                WHERE ElementoId = ? AND Activo = 1
-            """, (elemento_id,))
-            r = cur.fetchone()
-            if not r:
-                return jsonify({'ok': False, 'error': 'not_found'}), 404
-            return jsonify({
-                'ok': True,
-                'id': r[0],
-                'nombre': r[1],
-                'valor_unitario': float(r[2] or 0),
-                'disponible': int(r[3] or 0),
-                'imagen': r[4]
-            })
-        else:
-            cur.execute("""
-                SELECT ElementoId, NombreElemento, ValorUnitario, CantidadDisponible
-                FROM dbo.ElementosPublicitarios
-                WHERE ElementoId = ? AND Activo = 1
-            """, (elemento_id,))
-            r = cur.fetchone()
-            if not r:
-                return jsonify({'ok': False, 'error': 'not_found'}), 404
-            return jsonify({
-                'ok': True,
-                'id': r[0],
-                'nombre': r[1],
-                'valor_unitario': float(r[2] or 0),
-                'disponible': int(r[3] or 0),
-                'imagen': None
-            })
-    except Exception as e:
-        print("Error api_elemento:", e)
-        return jsonify({'ok': False, 'error': str(e)}), 500
-    finally:
-        try:
-            if cur: cur.close()
-            if conn: conn.close()
-        except:
-            pass
-
-@bp_prestamos.route('/api/elemento/<int:elemento_id>')
-def api_elemento_info(elemento_id):
+def api_elemento_info(elemento_id: int):
     """API para obtener información de un elemento publicitario"""
     if not _require_login():
         return jsonify({'ok': False, 'error': 'No autorizado'}), 401
@@ -733,14 +711,7 @@ def api_elemento_info(elemento_id):
         conn = get_database_connection()
         cur = conn.cursor()
         
-        # Detectar columna de imagen
-        cur.execute("SELECT TOP 1 * FROM dbo.ElementosPublicitarios")
-        col_names = [desc[0] for desc in cur.description]
-        img_col = None
-        for c in ["RutaImagen", "ImagenURL", "ImagenUrl", "Imagen", "FotoURL", "FotoUrl", "Foto"]:
-            if c in col_names:
-                img_col = c
-                break
+        img_col = _detect_image_column(cur)
         
         if img_col:
             cur.execute(f"""
@@ -757,16 +728,9 @@ def api_elemento_info(elemento_id):
         
         row = cur.fetchone()
         if row:
-            # Procesar imagen
             imagen_url = ""
-            if img_col and row[4]:
-                img = row[4]
-                if img.startswith('http'):
-                    imagen_url = img
-                elif img.startswith('static/'):
-                    imagen_url = url_for('static', filename=img.replace('static/', ''))
-                else:
-                    imagen_url = url_for('static', filename=img)
+            if img_col and len(row) >= 5:
+                imagen_url = _normalize_image_url(row[4])
             
             return jsonify({
                 'ok': True,
@@ -786,7 +750,8 @@ def api_elemento_info(elemento_id):
         try:
             if cur: cur.close()
             if conn: conn.close()
-        except: pass
+        except: 
+            pass
 
 # ==========================================================
 # Rutas: Aprobar, Aprobar Parcial y Rechazar Préstamos
@@ -797,7 +762,7 @@ def aprobar_prestamo(prestamo_id: int):
         return redirect('/login')
     if not _has_role('administrador', 'lider_inventario'):
         flash('No autorizado para aprobar préstamos', 'danger')
-        return redirect(url_for('prestamos.listar'))
+        return redirect(url_for('prestamos.listar_prestamos'))
 
     conn = cur = None
     try:
@@ -813,12 +778,12 @@ def aprobar_prestamo(prestamo_id: int):
         
         if not result:
             flash('Préstamo no encontrado', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         estado_actual = result[0]
         if estado_actual != 'PRESTADO':
             flash('Solo se pueden aprobar préstamos en estado PRESTADO', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         # Actualizar estado a APROBADO
         cur.execute("""
@@ -838,9 +803,10 @@ def aprobar_prestamo(prestamo_id: int):
         try:
             if cur: cur.close()
             if conn: conn.close()
-        except: pass
+        except: 
+            pass
     
-    return redirect(url_for('prestamos.listar'))
+    return redirect(url_for('prestamos.listar_prestamos'))
 
 @bp_prestamos.post('/<int:prestamo_id>/aprobar_parcial')
 def aprobar_parcial_prestamo(prestamo_id: int):
@@ -848,13 +814,13 @@ def aprobar_parcial_prestamo(prestamo_id: int):
         return redirect('/login')
     if not _has_role('administrador', 'lider_inventario'):
         flash('No autorizado para aprobar préstamos', 'danger')
-        return redirect(url_for('prestamos.listar'))
+        return redirect(url_for('prestamos.listar_prestamos'))
 
     cantidad_aprobada = request.form.get('cantidad_aprobada')
     
     if not cantidad_aprobada or int(cantidad_aprobada) <= 0:
         flash('La cantidad aprobada debe ser mayor a 0', 'warning')
-        return redirect(url_for('prestamos.listar'))
+        return redirect(url_for('prestamos.listar_prestamos'))
 
     conn = cur = None
     try:
@@ -871,17 +837,17 @@ def aprobar_parcial_prestamo(prestamo_id: int):
         
         if not result:
             flash('Préstamo no encontrado', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         estado_actual, cantidad_prestada, elemento_id = result
         if estado_actual != 'PRESTADO':
             flash('Solo se pueden aprobar préstamos en estado PRESTADO', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         cantidad_aprobada_int = int(cantidad_aprobada)
         if cantidad_aprobada_int > cantidad_prestada:
             flash('La cantidad aprobada no puede ser mayor a la cantidad prestada', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         # Calcular diferencia para devolver al stock
         diferencia = cantidad_prestada - cantidad_aprobada_int
@@ -912,9 +878,10 @@ def aprobar_parcial_prestamo(prestamo_id: int):
         try:
             if cur: cur.close()
             if conn: conn.close()
-        except: pass
+        except: 
+            pass
     
-    return redirect(url_for('prestamos.listar'))
+    return redirect(url_for('prestamos.listar_prestamos'))
 
 @bp_prestamos.post('/<int:prestamo_id>/rechazar')
 def rechazar_prestamo(prestamo_id: int):
@@ -922,13 +889,13 @@ def rechazar_prestamo(prestamo_id: int):
         return redirect('/login')
     if not _has_role('administrador', 'lider_inventario'):
         flash('No autorizado para rechazar préstamos', 'danger')
-        return redirect(url_for('prestamos.listar'))
+        return redirect(url_for('prestamos.listar_prestamos'))
 
     observacion = request.form.get('observacion', '').strip()
     
     if not observacion:
         flash('La observación es obligatoria para rechazar un préstamo', 'warning')
-        return redirect(url_for('prestamos.listar'))
+        return redirect(url_for('prestamos.listar_prestamos'))
 
     conn = cur = None
     try:
@@ -945,15 +912,15 @@ def rechazar_prestamo(prestamo_id: int):
         
         if not result:
             flash('Préstamo no encontrado', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         estado_actual, observaciones_actuales, cantidad_prestada, elemento_id = result
         if estado_actual != 'PRESTADO':
             flash('Solo se pueden rechazar préstamos en estado PRESTADO', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         # Construir nuevas observaciones: las actuales + la nueva observación de rechazo
-        nuevas_observaciones = observaciones_actuales or ''
+        nuevas_observaciones = (observaciones_actuales or '')
         if observacion:
             nuevas_observaciones += f" | Rechazo: {observacion}"
 
@@ -982,9 +949,10 @@ def rechazar_prestamo(prestamo_id: int):
         try:
             if cur: cur.close()
             if conn: conn.close()
-        except: pass
+        except: 
+            pass
     
-    return redirect(url_for('prestamos.listar'))
+    return redirect(url_for('prestamos.listar_prestamos'))
 
 # ==========================================================
 # Ruta: Registrar Devolución
@@ -995,7 +963,7 @@ def registrar_devolucion(prestamo_id: int):
         return redirect('/login')
     if not _has_role('administrador', 'lider_inventario'):
         flash('No autorizado para registrar devoluciones', 'danger')
-        return redirect(url_for('prestamos.listar'))
+        return redirect(url_for('prestamos.listar_prestamos'))
 
     observacion = request.form.get('observacion', '').strip()
     usuario_devolucion = session.get('usuario_nombre', 'Sistema')
@@ -1015,15 +983,15 @@ def registrar_devolucion(prestamo_id: int):
         
         if not result:
             flash('Préstamo no encontrado', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         estado_actual, observaciones_actuales, cantidad_prestada, elemento_id = result
         if estado_actual not in ['APROBADO', 'APROBADO_PARCIAL']:
             flash('Solo se pueden devolver préstamos en estado APROBADO o APROBADO_PARCIAL', 'warning')
-            return redirect(url_for('prestamos.listar'))
+            return redirect(url_for('prestamos.listar_prestamos'))
         
         # Construir nuevas observaciones: las actuales + la nueva observación de devolución
-        nuevas_observaciones = observaciones_actuales or ''
+        nuevas_observaciones = (observaciones_actuales or '')
         if observacion:
             nuevas_observaciones += f" | Devolución [{usuario_devolucion}]: {observacion}"
 
@@ -1037,7 +1005,7 @@ def registrar_devolucion(prestamo_id: int):
             WHERE PrestamoId = ?
         """, (nuevas_observaciones, usuario_devolucion, prestamo_id))
         
-        # También, debemos devolver la cantidad prestada al stock del elemento
+        # Devolver la cantidad prestada al stock del elemento
         cur.execute("""
             UPDATE dbo.ElementosPublicitarios
             SET CantidadDisponible = CantidadDisponible + ?
@@ -1055,6 +1023,7 @@ def registrar_devolucion(prestamo_id: int):
         try:
             if cur: cur.close()
             if conn: conn.close()
-        except: pass
+        except: 
+            pass
     
-    return redirect(url_for('prestamos.listar'))
+    return redirect(url_for('prestamos.listar_prestamos'))

@@ -59,9 +59,11 @@
     <Compile Include="blueprints\inventario_corporativo.py" />
     <Compile Include="blueprints\materiales.py" />
     <Compile Include="blueprints\oficinas.py" />
+    <Compile Include="blueprints\prestamos.py" />
     <Compile Include="blueprints\reportes.py" />
     <Compile Include="blueprints\solicitudes.py" />
     <Compile Include="config\config.py" />
+    <Compile Include="config\permissions.py" />
     <Compile Include="config\__init__.py" />
     <Compile Include="database.py" />
     <Compile Include="models\generar_hash.py" />
@@ -79,6 +81,7 @@
     <Compile Include="templates\solicitudes\__init__.py" />
     <Compile Include="blueprints\auth.py" />
     <Compile Include="utils\helpers.py" />
+    <Compile Include="utils\permissions.py" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="models\" />

@@ -1,21 +1,31 @@
 ﻿# -*- coding: utf-8 -*-
 import os
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, session, flash, jsonify, url_for, send_file
+from flask import (
+    Flask, render_template, request, redirect, session, flash,
+    jsonify, url_for, send_file
+)
 from werkzeug.utils import secure_filename
 
-# Importar modelos
+# ===============================
+# 📦 Importación de Modelos
+# ===============================
 from models.materiales_model import MaterialModel
 from models.oficinas_model import OficinaModel
 from models.solicitudes_model import SolicitudModel
 from models.usuarios_model import UsuarioModel
 from models.inventario_corporativo_model import InventarioCorporativoModel
 
-# Importar Utils de forma directa
+# ===============================
+# ⚙️ Importación de Utilidades
+# ===============================
 from utils.filters import filtrar_por_oficina_usuario, verificar_acceso_oficina
 from utils.initialization import inicializar_oficina_principal
+from utils.permissions import can_access, can_view_actions, get_accessible_modules
 
-# Blueprints
+# ===============================
+# 🧩 Importación de Blueprints
+# ===============================
 from blueprints.auth import auth_bp
 from blueprints.materiales import materiales_bp
 from blueprints.solicitudes import solicitudes_bp
@@ -26,14 +36,19 @@ from blueprints.aprobacion import aprobacion_bp
 from blueprints.api import api_bp
 from blueprints.inventario_corporativo import inventario_corporativo_bp
 
-# Importar blueprints con alias para consistencia
+# Importación adicional de rutas (si conviven con blueprints dedicados)
 from routes_prestamos import bp_prestamos
 from routes_inventario_corporativo import bp_inv as bp_inventario_corporativo
 
-# Importar conexión a base de datos
+# ===============================
+# 💾 Conexión a Base de Datos
+# ===============================
 from database import get_database_connection
 
-# Configuración de la aplicación
+
+# ===============================
+# 🚀 Configuración de la Aplicación
+# ===============================
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(
@@ -42,11 +57,14 @@ app = Flask(
     static_folder=os.path.join(BASE_DIR, 'static')
 )
 
+# Configuración básica
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(32))
 app.config['JSON_AS_ASCII'] = False
-app.config['TEMPLATES_AUTO_RELOAD'] = True  
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 
-# Configuración de uploads
+# ===============================
+# 📂 Configuración de Uploads
+# ===============================
 UPLOAD_FOLDER = 'static/uploads'
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
@@ -55,31 +73,50 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 print(f"✅ Directorio de uploads: {os.path.abspath(UPLOAD_FOLDER)}")
 
-# Registrar blueprints (CORREGIDO - sin duplicados)
+
+# ===============================
+# 🧠 Context Processor (Permisos)
+# ===============================
+@app.context_processor
+def inject_permissions():
+    return {
+        'can_access': can_access,
+        'can_view_actions': can_view_actions,
+        'get_accessible_modules': get_accessible_modules
+    }
+
+
+# ===============================
+# 🔗 Registro de Blueprints
+# ===============================
+# ⚠️ IMPORTANTE: Asegúrate de que cada blueprint define su propio url_prefix
+# dentro del módulo, o ajusta aquí usando: app.register_blueprint(bp, url_prefix="/ruta")
+
+# Rutas adicionales (no-blueprint o BP definidos fuera de /blueprints)
 app.register_blueprint(bp_prestamos)
 app.register_blueprint(bp_inventario_corporativo)
-app.register_blueprint(auth_bp)   
-app.register_blueprint(materiales_bp)
-app.register_blueprint(solicitudes_bp)
+
+# Blueprints principales
+app.register_blueprint(auth_bp)
+app.register_blueprint(materiales_bp)      # ✅ materiales_bp registrado
+app.register_blueprint(solicitudes_bp)     # ✅ solicitudes_bp registrado
 app.register_blueprint(oficinas_bp)
 app.register_blueprint(aprobadores_bp)
 app.register_blueprint(reportes_bp)
-
-
-# Registrar nuevos blueprints (SOLO UNA VEZ)
 app.register_blueprint(aprobacion_bp)
 app.register_blueprint(api_bp)
-
-# CORREGIDO: Registrar inventario corporativo SIN url_prefix ya que las rutas ya lo incluyen
 app.register_blueprint(inventario_corporativo_bp)
 
-# Verificar que los blueprints estén registrados correctamente
+# ===============================
+# ✅ Verificación de Registro
+# ===============================
 print("✅ Blueprints registrados:")
 for name in app.blueprints:
     print(f"   - {name}")
 
+
 # ============================================================================
-# ERROR HANDLERS
+# 🔥 ERROR HANDLERS
 # ============================================================================
 @app.errorhandler(404)
 def pagina_no_encontrada(error):
@@ -87,6 +124,7 @@ def pagina_no_encontrada(error):
 
 @app.errorhandler(500)
 def error_interno(error):
+    # Puedes loggear el error aquí si lo deseas
     return render_template('error/500.html'), 500
 
 @app.errorhandler(413)
@@ -94,8 +132,9 @@ def archivo_demasiado_grande(error):
     flash('El archivo es demasiado grande. Tamaño máximo: 16MB', 'danger')
     return redirect(request.url)
 
+
 # ============================================================================
-# INICIALIZACIÓN
+# 🏁 INICIALIZACIÓN
 # ============================================================================
 if __name__ == '__main__':
     print("🚀 Iniciando servidor Flask...")
@@ -106,7 +145,9 @@ if __name__ == '__main__':
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
         print(f"✅ Creado directorio de uploads: {UPLOAD_FOLDER}")
-    
+
     # Inicializar Sede Principal usando la función importada
     inicializar_oficina_principal()
+
+    # Ejecutar aplicación
     app.run(debug=True, host='0.0.0.0', port=5000)

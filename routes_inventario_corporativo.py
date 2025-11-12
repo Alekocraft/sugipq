@@ -13,6 +13,7 @@ def _has_role(*roles):
     rol = (session.get('rol', 'usuario') or 'usuario').strip().lower()
     return rol in [r.lower() for r in roles]
 
+# routes_inventario_corporativo.py - MODIFICAR LA RUTA inv_listar
 @bp_inv.route('/inventario-corporativo')
 def inv_listar():
     if not _require_login():
@@ -24,14 +25,19 @@ def inv_listar():
         return redirect('/dashboard')
     
     try:
-        productos = InventarioCorporativoModel.obtener_todos()
+        # ✅ NUEVO: Aplicar filtro por oficina según permisos
+        from utils.permissions import user_can_view_all
+        if user_can_view_all():
+            productos = InventarioCorporativoModel.obtener_todos()
+        else:
+            oficina_id = session.get('oficina_id')
+            productos = InventarioCorporativoModel.obtener_por_oficina(oficina_id)
         
-        # Calcular estadísticas para las tarjetas
+        # El resto del código permanece igual...
         valor_total_inventario = sum(p.get('valor_unitario', 0) * p.get('cantidad', 0) for p in productos)
         productos_bajo_stock = len([p for p in productos if p.get('cantidad', 0) <= p.get('cantidad_minima', 5)])
         productos_asignables = len([p for p in productos if p.get('es_asignable', False)])
         
-        # Obtener categorías únicas para filtros
         categorias_db = InventarioCorporativoModel.obtener_categorias() or []
         categorias_unicas = list(set([cat.get('nombre_categoria', '') for cat in categorias_db if cat.get('nombre_categoria')]))
         
@@ -51,7 +57,6 @@ def inv_listar():
     except Exception as e:
         print(f"❌ Error cargando inventario corporativo: {e}")
         flash('Error al cargar el inventario corporativo', 'danger')
-        # Proporcionar valores por defecto para evitar el error
         return render_template('inventario_corporativo/listar.html',
                             productos=[],
                             valor_total_inventario=0,

@@ -1,17 +1,17 @@
-# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-.
 import os
 from datetime import timedelta
 
 class Config:
-    """Configuraci髇 base para toda la aplicaci髇"""
+    """Configuraci贸n base para toda la aplicaci贸n"""
     
     # Clave secreta
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
     
-    # Configuraci髇 de Flask
+    # Configuraci贸n de Flask
     JSON_AS_ASCII = False
     TEMPLATES_AUTO_RELOAD = True
-    SESSION_COOKIE_SECURE = False  # True en producci髇 con HTTPS
+    SESSION_COOKIE_SECURE = False  # True en producci贸n con HTTPS
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = timedelta(hours=8)
@@ -26,7 +26,7 @@ class Config:
     TEMPLATE_FOLDER = os.path.join(BASE_DIR, 'templates')
     STATIC_FOLDER = os.path.join(BASE_DIR, 'static')
     
-    # Configuraci髇 de roles y permisos
+    # Configuraci贸n de roles y permisos
     ROLES = {
         'administrador': ['dashboard', 'materiales', 'solicitudes', 'oficinas', 'aprobadores', 'reportes', 'inventario_corporativo', 'prestamos'],
         'lider_inventario': ['dashboard', 'materiales', 'solicitudes', 'reportes', 'inventario_corporativo'],
@@ -38,32 +38,32 @@ class Config:
 
 
 class DevelopmentConfig(Config):
-    """Configuraci髇 para desarrollo"""
+    """Configuraci贸n para desarrollo"""
     DEBUG = True
     TESTING = False
     ENV = 'development'
 
 
 class ProductionConfig(Config):
-    """Configuraci髇 para producci髇"""
+    """Configuraci贸n para producci贸n"""
     DEBUG = False
     TESTING = False
     ENV = 'production'
     
-    # Seguridad en producci髇
+    # Seguridad en producci贸n
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
 
 
 class TestingConfig(Config):
-    """Configuraci髇 para testing"""
+    """Configuraci贸n para testing"""
     DEBUG = True
     TESTING = True
     ENV = 'testing'
     WTF_CSRF_ENABLED = False
 
 
-# Configuraci髇 por entorno
+# Configuraci贸n por entorno
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,

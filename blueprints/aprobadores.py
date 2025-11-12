@@ -1,32 +1,36 @@
-# blueprints/aprobadores.py
-from flask import Blueprint, render_template, request, redirect, session, flash, url_for
+from flask import Blueprint, render_template, request, redirect, session, flash, url_for, current_app
 from models.usuarios_model import UsuarioModel
+from utils.permissions import can_access
 
-# Crear blueprint de aprobadores
+# 📘 Crear blueprint de aprobadores
 aprobadores_bp = Blueprint('aprobadores', __name__, url_prefix='/aprobadores')
 
-# Helpers de autenticación locales
+
+# 🧩 Helper: Verifica si el usuario está logueado
 def _require_login():
     return 'usuario_id' in session
 
-def _has_role(*roles):
-    rol = (session.get('rol', '') or '').strip().lower()
-    return rol in [r.lower() for r in roles]
 
+# 📄 Ruta principal: listar aprobadores
 @aprobadores_bp.route('/')
 def listar_aprobadores():
+    # 🔒 Verificación de sesión
     if not _require_login():
-        return redirect('/login')
+        flash('Debe iniciar sesión para acceder a esta sección', 'warning')
+        return redirect(url_for('auth.login'))
 
-    # ? SOLO admin, lider_inventario y oficina_principal
-    if not _has_role('administrador', 'lider_inventario', 'oficina_principal'):
+    # 🔐 Verificación de permisos
+    if not can_access('aprobadores', 'view'):
         flash('No tiene permisos para acceder a esta sección', 'danger')
-        return redirect('/dashboard')
+        return redirect(url_for('dashboard'))
 
     try:
+        # 📦 Obtener lista de aprobadores desde el modelo
         aprobadores = UsuarioModel.obtener_aprobadores() or []
         return render_template('aprobadores/listar.html', aprobadores=aprobadores)
+
     except Exception as e:
-        print(f"? Error obteniendo aprobadores: {e}")
-        flash('Error al cargar los aprobadores', 'danger')
+        # ⚠️ Manejo de errores
+        current_app.logger.error(f"❌ Error obteniendo aprobadores: {e}")
+        flash('Ocurrió un error al cargar los aprobadores', 'danger')
         return render_template('aprobadores/listar.html', aprobadores=[])

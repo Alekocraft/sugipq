@@ -5,6 +5,24 @@ from models.usuarios_model import UsuarioModel
 # ✅ CAMBIO CRÍTICO: Agregar url_prefix para mantener URLs originales
 auth_bp = Blueprint('auth', __name__, url_prefix='')
 
+# ✅ Nueva función: Asignar rol según la oficina
+def assign_role_by_office(office_name):
+    """
+    Devuelve el rol asignado según el nombre de la oficina.
+    """
+    office_name = office_name.lower().strip() if office_name else ''
+    
+    if 'gerencia' in office_name:
+        return 'admin'
+    elif 'almacén' in office_name or 'logística' in office_name:
+        return 'almacen'
+    elif 'finanzas' in office_name or 'contabilidad' in office_name:
+        return 'finanzas'
+    elif 'rrhh' in office_name or 'recursos humanos' in office_name:
+        return 'rrhh'
+    else:
+        return 'usuario'  # Rol por defecto
+
 @auth_bp.route('/')
 def index():
     if 'usuario_id' in session:
@@ -24,13 +42,15 @@ def login():
         try:
             usuario_info = UsuarioModel.verificar_credenciales(usuario, contraseña)
             if usuario_info:
+                # ✅ CORRECCIÓN: USAR EL ROL DE LA BASE DE DATOS
                 session['usuario_id'] = usuario_info['id']
                 session['usuario_nombre'] = usuario_info['nombre']
                 session['usuario'] = usuario_info['usuario']
-                session['rol'] = usuario_info['rol'].lower().strip()
+                session['rol'] = usuario_info['rol']  # ← ESTA ES LA LÍNEA CLAVE
                 session['oficina_id'] = usuario_info.get('oficina_id', 1)
-                session['oficina_nombre'] = usuario_info.get('oficina_nombre', 'Sede Principal')
-                print(f"✅ Login exitoso: {usuario} - Rol: {usuario_info['rol']} - Oficina: {session['oficina_nombre']}")
+                session['oficina_nombre'] = usuario_info.get('oficina_nombre', '')
+                
+                print(f"✅ Login exitoso: {usuario} - Rol: {usuario_info['rol']} - Oficina: {usuario_info.get('oficina_nombre', '')}")
                 flash(f'¡Bienvenido {usuario_info["nombre"]}!', 'success')
                 return redirect('/dashboard')
             else:
@@ -39,6 +59,8 @@ def login():
                 return render_template('auth/login.html')
         except Exception as e:
             print(f"❌ Error durante login: {e}")
+            import traceback
+            print(f"❌ Traceback: {traceback.format_exc()}")
             flash('Error del sistema durante el login', 'danger')
             return render_template('auth/login.html')
     
@@ -50,6 +72,7 @@ def logout():
     flash('Sesión cerrada correctamente', 'info')
     return redirect('/login')
 
+# blueprints/auth.py - MODIFICAR LA RUTA dashboard
 @auth_bp.route('/dashboard')
 def dashboard():
     if 'usuario_id' not in session:
@@ -57,6 +80,11 @@ def dashboard():
     
     try:
         print("📊 Cargando dashboard...")
+        
+        # ✅ NUEVO: Obtener filtro de oficina según permisos
+        from utils.permissions import user_can_view_all
+        oficina_id = None if user_can_view_all() else session.get('oficina_id')
+        
         materiales = []
         oficinas = []
         solicitudes = []
@@ -64,7 +92,7 @@ def dashboard():
         
         try:
             from models.materiales_model import MaterialModel
-            materiales = MaterialModel.obtener_todos() or []
+            materiales = MaterialModel.obtener_todos(oficina_id) or []
             print(f"✅ Materiales cargados: {len(materiales)}")
         except Exception as e:
             print(f"⚠️ Error cargando materiales: {e}")
@@ -80,7 +108,7 @@ def dashboard():
         
         try:
             from models.solicitudes_model import SolicitudModel
-            solicitudes = SolicitudModel.obtener_todas() or []
+            solicitudes = SolicitudModel.obtener_todas(oficina_id) or []
             print(f"✅ Solicitudes cargadas: {len(solicitudes)}")
         except Exception as e:
             print(f"⚠️ Error cargando solicitudes: {e}")

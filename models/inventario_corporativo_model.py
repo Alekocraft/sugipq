@@ -97,6 +97,48 @@ class InventarioCorporativoModel:
             if conn: conn.close()
 
     @staticmethod
+    def obtener_por_oficina(oficina_id):
+        """Obtiene productos corporativos filtrados por oficina"""
+        conn = get_database_connection()
+        if not conn:
+            return []
+        cursor = None
+        try:
+            cursor = conn.cursor()
+            query = """
+                SELECT DISTINCT
+                    p.ProductoId           AS id,
+                    p.CodigoUnico          AS codigo_unico,
+                    p.NombreProducto       AS nombre,
+                    p.Descripcion          AS descripcion,
+                    c.NombreCategoria      AS categoria,
+                    pr.NombreProveedor     AS proveedor,
+                    p.ValorUnitario        AS valor_unitario,
+                    p.CantidadDisponible   AS cantidad,
+                    p.CantidadMinima       AS cantidad_minima,
+                    p.Ubicacion            AS ubicacion,
+                    p.EsAsignable          AS es_asignable,
+                    p.RutaImagen           AS ruta_imagen,
+                    p.FechaCreacion        AS fecha_creacion,
+                    p.UsuarioCreador       AS usuario_creador
+                FROM ProductosCorporativos p
+                INNER JOIN CategoriasProductos c ON p.CategoriaId = c.CategoriaId
+                INNER JOIN Proveedores pr        ON p.ProveedorId = pr.ProveedorId
+                LEFT JOIN Asignaciones a ON p.ProductoId = a.ProductoId AND a.Activo = 1
+                WHERE p.Activo = 1 AND (a.OficinaId = ? OR p.OficinaCreadoraId = ?)
+                ORDER BY p.NombreProducto
+            """
+            cursor.execute(query, (oficina_id, oficina_id))
+            cols = [c[0] for c in cursor.description]
+            return [dict(zip(cols, r)) for r in cursor.fetchall()]
+        except Exception as e:
+            print(f"Error obteniendo productos corporativos por oficina: {e}")
+            return []
+        finally:
+            if cursor: cursor.close()
+            if conn: conn.close()
+
+    @staticmethod
     def obtener_por_id(producto_id):
         conn = get_database_connection()
         if not conn:
@@ -319,6 +361,9 @@ class InventarioCorporativoModel:
             if conn: conn.close()
 
     # ================== ASIGNACIONES / TRAZABILIDAD ==================
+    # models/inventario_corporativo_model.py - CORREGIR LÍNEA 392
+    # =================================================================
+
     @staticmethod
     def asignar_a_oficina(producto_id, oficina_id, cantidad, usuario_accion):
         """
@@ -331,7 +376,7 @@ class InventarioCorporativoModel:
         cursor = None
         try:
             cursor = conn.cursor()
-    
+
             # 1. PRIMERO: Obtener un UsuarioId válido
             cursor.execute("SELECT TOP 1 UsuarioId FROM Usuarios WHERE Activo = 1 ORDER BY UsuarioId")
             usuario_row = cursor.fetchone()
@@ -339,7 +384,7 @@ class InventarioCorporativoModel:
                 print("Error: No hay usuarios activos en la base de datos")
                 return False
             usuario_asignado_id = usuario_row[0]
-    
+
             # 2. Verificar stock
             cursor.execute("SELECT CantidadDisponible FROM ProductosCorporativos WHERE ProductoId = ? AND Activo = 1", (int(producto_id),))
             row = cursor.fetchone()
@@ -347,7 +392,9 @@ class InventarioCorporativoModel:
                 return False
             stock = int(row[0])
             cant = int(cantidad)
-            if cant <= 0 or cant > stock:
+        
+            # ✅ CORRECCIÓN: Cambiar "oR" por "or"
+            if cant <= 0 or cant > stock:  # <- Línea corregida
                 return False
 
             # 3. Descontar stock
