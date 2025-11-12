@@ -41,37 +41,160 @@ ROLE_PERMISSIONS = {
         'office_filter': 'COQ'
     },
     'oficina_cali': {
-        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas'],  # ✅ Agregar 'oficinas'
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
         'actions': {
-            # ❌ MATERIALES: SIN ACCESO
             'materiales': [],
-
-            # ✅ SOLICITUDES: Solo puede CREAR, no ver listado
             'solicitudes': ['create'],
-
-            # ✅ OFICINAS: Puede ver (NUEVO)
             'oficinas': ['view'],
-
-            # ✅ APROBADORES: Puede ver
             'aprobadores': ['view'],
-
-            # ✅ PRÉSTAMOS: Puede ver sus préstamos y crear nuevos
             'prestamos': ['view_own', 'create'],
-
-            # ✅ REPORTES: Solo de su oficina (NO TOCAR)
             'reportes': ['view_own']
         },
         'office_filter': 'CALI'
-    },  # ←🚩 faltaba esta coma
-    'oficina_medellin': {
-        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes'],
+    },
+    'oficina_pereira': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
         'actions': {
-            'materiales': ['view', 'create'],
-            'solicitudes': ['view', 'create'],
-            'prestamos': ['view', 'create'],
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'PEREIRA'
+    },
+    'oficina_neiva': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'NEIVA'
+    },
+    'oficina_kennedy': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'KENNEDY'
+    },
+    'oficina_bucaramanga': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'BUCARAMANGA'
+    },
+    'oficina_polo_club': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'POLO CLUB'
+    },
+    'oficina_nogal': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'NOGAL'
+    },
+    'oficina_tunja': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'TUNJA'
+    },
+    'oficina_cartagena': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'CARTAGENA'
+    },
+    'oficina_morato': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'MORATO'
+    },
+    'oficina_medellin': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
             'reportes': ['view_own']
         },
         'office_filter': 'MEDELLÍN'
+    },
+    'oficina_cedritos': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'CEDRITOS'
+    },
+    'oficina_lourdes': {
+        'modules': ['dashboard', 'material_pop', 'prestamo_material', 'reportes', 'oficinas', 'solicitudes'],
+        'actions': {
+            'materiales': [],
+            'solicitudes': ['create'],
+            'oficinas': ['view'],
+            'aprobadores': ['view'],
+            'prestamos': ['view_own', 'create'],
+            'reportes': ['view_own']
+        },
+        'office_filter': 'LOURDES'
     },
     'oficina_regular': {
         'modules': ['dashboard', 'reportes'],

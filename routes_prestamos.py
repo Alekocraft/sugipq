@@ -1,6 +1,6 @@
 ﻿# routes_prestamos.py
 from flask import (
-    Blueprint, render_template, request, redirect, session, flash,
+    Blueprint, render_template, request, redirect, session, flash, 
     send_file, url_for, jsonify, current_app
 )
 from datetime import datetime
@@ -27,7 +27,8 @@ except Exception:
     HAS_REPORTLAB = False
 
 # Tu helper de conexión (pyodbc / SQL Server)
-from database import get_database_connection  # mantener como en el resto del proyecto
+from database import get_database_connection
+from utils.permissions import can_view_actions
 
 bp_prestamos = Blueprint('prestamos', __name__, url_prefix='/prestamos')
 
@@ -230,7 +231,6 @@ def _fetch_detalle(prestamo_id: int):
 
 # ==========================================================
 # Rutas: Listar + Filtro + Export (Excel/PDF)
-# (ÚNICA VERSIÓN para evitar conflictos)
 # ==========================================================
 @bp_prestamos.get('/')
 def listar_prestamos():
@@ -380,8 +380,10 @@ def crear_elemento_publicitario_get():
     if not _require_login():
         return redirect('/login')
     
-    # ✅ NUEVA VERIFICACIÓN: Restringir para oficina_cali
-    if _has_role('oficina_cali'):
+    # ✅ VERIFICACIÓN: Restringir para oficinas específicas
+    if _has_role('oficina_pereira', 'oficina_neiva', 'oficina_kennedy', 'oficina_bucaramanga', 
+                 'oficina_polo_club', 'oficina_nogal', 'oficina_tunja', 'oficina_lourdes',
+                 'oficina_cartagena', 'oficina_morato', 'oficina_medellin', 'oficina_cedritos'):
         flash('No tiene permisos para crear materiales publicitarios', 'danger')
         return redirect('/prestamos')
     
@@ -391,21 +393,22 @@ def crear_elemento_publicitario_get():
 
     return render_template('prestamos/elemento_crear.html')
 
+# POST: /prestamos/elementos/crearmaterial
 @bp_prestamos.route('/elementos/crearmaterial', methods=['POST'], endpoint='crear_elemento_publicitario_post')
 def crear_elemento_publicitario_post():
     if not _require_login():
         return redirect('/login')
     
-    # ✅ NUEVA VERIFICACIÓN: Restringir para oficina_cali
-    if _has_role('oficina_cali'):
+    # ✅ VERIFICACIÓN: Restringir para oficinas específicas
+    if _has_role('oficina_pereira', 'oficina_neiva', 'oficina_kennedy', 'oficina_bucaramanga', 
+                 'oficina_polo_club', 'oficina_nogal', 'oficina_tunja', 'oficina_lourdes',
+                 'oficina_cartagena', 'oficina_morato', 'oficina_medellin', 'oficina_cedritos'):
         flash('No tiene permisos para crear materiales publicitarios', 'danger')
         return redirect('/prestamos')
     
     if not _has_role('administrador', 'lider_inventario'):
         flash('No autorizado para crear materiales', 'danger')
         return redirect('/prestamos/elementos/crearmaterial')
-    
-    # ... resto del código ...
 
     nombre_elemento = (request.form.get('nombre_elemento') or '').strip()
     valor_unitario_str = request.form.get('valor_unitario', '0')
@@ -438,12 +441,11 @@ def crear_elemento_publicitario_post():
             from werkzeug.utils import secure_filename
             import os
             filename = secure_filename(imagen.filename)
-            static_dir = current_app.static_folder  # más portable
+            static_dir = current_app.static_folder
             upload_dir = os.path.join(static_dir, 'uploads', 'elementos')
             os.makedirs(upload_dir, exist_ok=True)
             file_path = os.path.join(upload_dir, filename)
             imagen.save(file_path)
-            # Guardamos la ruta relativa al static, para normalizar luego con url_for('static', filename=...)
             ruta_imagen = f'uploads/elementos/{filename}'
             print(f"✅ Imagen guardada: {ruta_imagen}")
         except Exception as e:
@@ -483,7 +485,7 @@ def crear_elemento_publicitario_post():
             int(oficina_id), 
             1, 
             datetime.now(),
-            10  # Valor por defecto para cantidad mínima
+            10
         ]
 
         # Agregar campos opcionales si existen
@@ -611,10 +613,10 @@ def crear_prestamo_post():
     elemento_id = request.form.get('elemento_id')
     cantidad = request.form.get('cantidad') or '0'
     fecha_prevista = request.form.get('fecha_prevista')
-    evento = (request.form.get('evento') or '').strip()  # NUEVO CAMPO
+    evento = (request.form.get('evento') or '').strip()
     observaciones = (request.form.get('observaciones') or '').strip()
 
-    # Validaciones (agregar evento)
+    # Validaciones
     if not elemento_id:
         flash('Debes seleccionar un elemento', 'warning')
         return redirect('/prestamos/crear')
@@ -639,7 +641,7 @@ def crear_prestamo_post():
         conn = get_database_connection()
         cur = conn.cursor()
         
-        # Valida stock (con hints para evitar sobre-préstamos en concurrencia)
+        # Valida stock
         cur.execute("""
             SELECT CantidadDisponible, NombreElemento
             FROM dbo.ElementosPublicitarios WITH (UPDLOCK, ROWLOCK)
@@ -659,7 +661,7 @@ def crear_prestamo_post():
         # Obtener usuario prestador de la sesión
         usuario_prestador = session.get('usuario_nombre', 'Sistema')
 
-        # Crea préstamo - INCLUYENDO TODAS LAS COLUMNAS REQUERIDAS
+        # Crea préstamo
         cur.execute("""
             INSERT INTO dbo.PrestamosElementos
                 (ElementoId, UsuarioSolicitanteId, OficinaId, CantidadPrestada, 
@@ -697,8 +699,7 @@ def crear_prestamo_post():
             pass
 
 # ==========================================================
-# API auxiliar: datos de un elemento (valor, disponible, imagen) para la UI
-# (ÚNICA VERSIÓN para evitar conflictos)
+# API auxiliar: datos de un elemento
 # ==========================================================
 @bp_prestamos.get('/api/elemento/<int:elemento_id>')
 def api_elemento_info(elemento_id: int):
@@ -760,7 +761,9 @@ def api_elemento_info(elemento_id: int):
 def aprobar_prestamo(prestamo_id: int):
     if not _require_login():
         return redirect('/login')
-    if not _has_role('administrador', 'lider_inventario'):
+    
+    # ✅ VERIFICAR ROLES ESPECÍFICOS
+    if not _has_role('administrador', 'aprobador'):
         flash('No autorizado para aprobar préstamos', 'danger')
         return redirect(url_for('prestamos.listar_prestamos'))
 
@@ -812,7 +815,9 @@ def aprobar_prestamo(prestamo_id: int):
 def aprobar_parcial_prestamo(prestamo_id: int):
     if not _require_login():
         return redirect('/login')
-    if not _has_role('administrador', 'lider_inventario'):
+    
+    # ✅ VERIFICAR ROLES ESPECÍFICOS
+    if not _has_role('administrador', 'aprobador'):
         flash('No autorizado para aprobar préstamos', 'danger')
         return redirect(url_for('prestamos.listar_prestamos'))
 
@@ -887,7 +892,9 @@ def aprobar_parcial_prestamo(prestamo_id: int):
 def rechazar_prestamo(prestamo_id: int):
     if not _require_login():
         return redirect('/login')
-    if not _has_role('administrador', 'lider_inventario'):
+    
+    # ✅ VERIFICAR ROLES ESPECÍFICOS
+    if not _has_role('administrador', 'aprobador'):
         flash('No autorizado para rechazar préstamos', 'danger')
         return redirect(url_for('prestamos.listar_prestamos'))
 
@@ -919,7 +926,7 @@ def rechazar_prestamo(prestamo_id: int):
             flash('Solo se pueden rechazar préstamos en estado PRESTADO', 'warning')
             return redirect(url_for('prestamos.listar_prestamos'))
         
-        # Construir nuevas observaciones: las actuales + la nueva observación de rechazo
+        # Construir nuevas observaciones
         nuevas_observaciones = (observaciones_actuales or '')
         if observacion:
             nuevas_observaciones += f" | Rechazo: {observacion}"
@@ -961,7 +968,9 @@ def rechazar_prestamo(prestamo_id: int):
 def registrar_devolucion(prestamo_id: int):
     if not _require_login():
         return redirect('/login')
-    if not _has_role('administrador', 'lider_inventario'):
+    
+    # ✅ VERIFICAR ROLES ESPECÍFICOS
+    if not _has_role('administrador', 'aprobador'):
         flash('No autorizado para registrar devoluciones', 'danger')
         return redirect(url_for('prestamos.listar_prestamos'))
 
@@ -990,12 +999,12 @@ def registrar_devolucion(prestamo_id: int):
             flash('Solo se pueden devolver préstamos en estado APROBADO o APROBADO_PARCIAL', 'warning')
             return redirect(url_for('prestamos.listar_prestamos'))
         
-        # Construir nuevas observaciones: las actuales + la nueva observación de devolución
+        # Construir nuevas observaciones
         nuevas_observaciones = (observaciones_actuales or '')
         if observacion:
             nuevas_observaciones += f" | Devolución [{usuario_devolucion}]: {observacion}"
 
-        # Actualizar el préstamo: estado, fecha de devolución real, observaciones y usuario de devolución
+        # Actualizar el préstamo
         cur.execute("""
             UPDATE dbo.PrestamosElementos 
             SET Estado = 'DEVUELTO', 
@@ -1005,7 +1014,7 @@ def registrar_devolucion(prestamo_id: int):
             WHERE PrestamoId = ?
         """, (nuevas_observaciones, usuario_devolucion, prestamo_id))
         
-        # Devolver la cantidad prestada al stock del elemento
+        # Devolver la cantidad prestada al stock
         cur.execute("""
             UPDATE dbo.ElementosPublicitarios
             SET CantidadDisponible = CantidadDisponible + ?

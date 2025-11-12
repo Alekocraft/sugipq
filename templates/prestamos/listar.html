@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" %} 
 {% block title %}Préstamos de Material - Sistema de Gestión{% endblock %}
 
 {% block content %}
@@ -15,7 +15,7 @@
             <a href="/prestamos/crear" class="btn btn-primary">
                 <i class="fas fa-plus"></i> Nuevo Préstamo
             </a>
-            <!-- BOTONES CORREGIDOS - EXPORTACIÓN FRONTEND -->
+            <!-- Exportación Frontend -->
             <button class="btn btn-success" onclick="exportarExcelPrestamos()">
                 <i class="fas fa-file-excel"></i> Exportar Excel
             </button>
@@ -60,7 +60,9 @@
                             <th>Fecha</th>
                             <th>Prevista</th>
                             <th>Estado</th>
-                            <th>Acciones</th>
+                            {% if can_view_actions() %}
+                                <th class="text-center">Acciones</th>
+                            {% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -87,7 +89,9 @@
                                     {{ r.estado }}
                                 </span>
                             </td>
-                            <td>
+
+                            {% if can_view_actions() %}
+                            <td class="text-center">
                                 <div class="btn-group" role="group">
                                     {% if r.estado == 'PRESTADO' %}
                                     <button type="button" class="btn btn-sm btn-success"
@@ -116,11 +120,15 @@
                                     {% endif %}
                                 </div>
                             </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
+
                         {% if not prestamos %}
                         <tr>
-                            <td colspan="11" class="text-center text-muted">Sin resultados</td>
+                            <td colspan="{% if can_view_actions() %}11{% else %}10{% endif %}" class="text-center text-muted">
+                                Sin resultados
+                            </td>
                         </tr>
                         {% endif %}
                     </tbody>
@@ -130,8 +138,8 @@
     </div>
 </div>
 
-<!-- Los modales se mantienen igual -->
-<!-- Modal para Aprobar -->
+<!-- Modales -->
+<!-- Modal Aprobar -->
 <div class="modal fade" id="aprobarModal" tabindex="-1" aria-labelledby="aprobarModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -153,7 +161,7 @@
     </div>
 </div>
 
-<!-- Modal para Aprobar Parcialmente -->
+<!-- Modal Aprobar Parcial -->
 <div class="modal fade" id="aprobarParcialModal" tabindex="-1" aria-labelledby="aprobarParcialModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -181,7 +189,7 @@
     </div>
 </div>
 
-<!-- Modal para Rechazar -->
+<!-- Modal Rechazar -->
 <div class="modal fade" id="rechazarModal" tabindex="-1" aria-labelledby="rechazarModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -208,7 +216,7 @@
     </div>
 </div>
 
-<!-- Modal para Devolución -->
+<!-- Modal Devolución -->
 <div class="modal fade" id="devolucionModal" tabindex="-1" aria-labelledby="devolucionModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -236,29 +244,20 @@
 </div>
 
 <style>
-    .table th {
-        white-space: nowrap;
-    }
-    
-    .table td {
-        vertical-align: middle;
-    }
-    
-    .btn-sm {
-        font-size: 0.75rem;
-        padding: 0.25rem 0.5rem;
-    }
+    .table th { white-space: nowrap; }
+    .table td { vertical-align: middle; }
+    .btn-sm { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
 </style>
 {% endblock %}
 
 {% block scripts %}
-<!-- Incluir las librerías para exportación -->
+<!-- Librerías para exportación -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
 <script>
-    // Función para exportar a Excel
+    // Exportar a Excel
     function exportarExcelPrestamos() {
         try {
             const tabla = document.getElementById('tablaPrestamos');
@@ -266,23 +265,19 @@
             const ws = XLSX.utils.table_to_sheet(tabla);
             XLSX.utils.book_append_sheet(wb, ws, 'Préstamos');
             XLSX.writeFile(wb, `Reporte_Préstamos_${new Date().toISOString().split('T')[0]}.xlsx`);
-
-            setTimeout(() => {
-                alert('✅ Exportación a Excel completada exitosamente');
-            }, 1000);
+            setTimeout(() => alert('✅ Exportación a Excel completada exitosamente'), 1000);
         } catch (error) {
             console.error('Error en exportación Excel:', error);
             alert('❌ Error al exportar a Excel');
         }
     }
 
-    // Función para exportar a PDF
+    // Exportar a PDF
     function exportarPDFPrestamos() {
         try {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
 
-            // Título del reporte
             doc.setFontSize(16);
             doc.text('Reporte de Préstamos - Sistema de Gestión', 14, 15);
             doc.setFontSize(10);
@@ -290,91 +285,71 @@
             doc.text(`Total de préstamos: {{ prestamos|length }}`, 14, 29);
             doc.text(`Filtro estado: {{ filtro_estado or 'Todos' }}`, 14, 36);
 
-            // Crear tabla en PDF
             doc.autoTable({
                 html: '#tablaPrestamos',
                 startY: 45,
                 theme: 'grid',
-                headStyles: { fillColor: [111, 66, 193] }, // Color morado
-                styles: { fontSize: 8 },
-                columnStyles: {
-                    0: { cellWidth: 15 },
-                    1: { cellWidth: 35 },
-                    2: { cellWidth: 15 },
-                    3: { cellWidth: 25 },
-                    4: { cellWidth: 25 },
-                    5: { cellWidth: 30 },
-                    6: { cellWidth: 25 },
-                    7: { cellWidth: 30 },
-                    8: { cellWidth: 30 },
-                    9: { cellWidth: 25 },
-                    10: { cellWidth: 30 }
-                }
+                headStyles: { fillColor: [111, 66, 193] },
+                styles: { fontSize: 8 }
             });
 
-            // Guardar PDF
             doc.save(`Reporte_Préstamos_${new Date().toISOString().split('T')[0]}.pdf`);
-
-            setTimeout(() => {
-                alert('✅ Exportación a PDF completada exitosamente');
-            }, 1000);
+            setTimeout(() => alert('✅ Exportación a PDF completada exitosamente'), 1000);
         } catch (error) {
             console.error('Error en exportación PDF:', error);
             alert('❌ Error al exportar a PDF');
         }
     }
 
-    // Script para manejar los modales (mantenido igual)
+    // Manejo de modales
     document.addEventListener('DOMContentLoaded', function () {
-        // Modal para Aprobar
+        // Aprobar
         const aprobarModal = document.getElementById('aprobarModal');
-        aprobarModal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const prestamoId = button.getAttribute('data-id');
-            const modalBodyInput = aprobarModal.querySelector('#aprobar_prestamo_id');
-            modalBodyInput.value = prestamoId;
-            document.getElementById('formAprobar').action = `/prestamos/${prestamoId}/aprobar`;
-        });
+        if (aprobarModal) {
+            aprobarModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const id = button.getAttribute('data-id');
+                document.getElementById('aprobar_prestamo_id').value = id;
+                document.getElementById('formAprobar').action = `/prestamos/${id}/aprobar`;
+            });
+        }
 
-        // Modal para Aprobar Parcialmente
+        // Aprobar parcial
         const aprobarParcialModal = document.getElementById('aprobarParcialModal');
-        aprobarParcialModal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const prestamoId = button.getAttribute('data-id');
-            const cantidadPrestada = button.getAttribute('data-cantidad');
-            const modalBodyInput = aprobarParcialModal.querySelector('#aprobar_parcial_prestamo_id');
-            const cantidadInput = aprobarParcialModal.querySelector('#cantidad_aprobada');
-            const maxCantidadSpan = aprobarParcialModal.querySelector('#max_cantidad');
+        if (aprobarParcialModal) {
+            aprobarParcialModal.addEventListener('show.bs.modal', function (event) {
+                const button = event.relatedTarget;
+                const id = button.getAttribute('data-id');
+                const cant = button.getAttribute('data-cantidad');
+                document.getElementById('aprobar_parcial_prestamo_id').value = id;
+                document.getElementById('cantidad_aprobada').value = cant;
+                document.getElementById('cantidad_aprobada').max = cant;
+                document.getElementById('max_cantidad').textContent = cant;
+                document.getElementById('formAprobarParcial').action = `/prestamos/${id}/aprobar_parcial`;
+            });
+        }
 
-            modalBodyInput.value = prestamoId;
-            cantidadInput.value = cantidadPrestada;
-            cantidadInput.max = cantidadPrestada;
-            maxCantidadSpan.textContent = cantidadPrestada;
-
-            document.getElementById('formAprobarParcial').action = `/prestamos/${prestamoId}/aprobar_parcial`;
-        });
-
-        // Modal para Rechazar
+        // Rechazar
         const rechazarModal = document.getElementById('rechazarModal');
-        rechazarModal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const prestamoId = button.getAttribute('data-id');
-            const modalBodyInput = rechazarModal.querySelector('#rechazar_prestamo_id');
-            modalBodyInput.value = prestamoId;
-            document.getElementById('formRechazar').action = `/prestamos/${prestamoId}/rechazar`;
-            document.getElementById('observacion').value = '';
-        });
+        if (rechazarModal) {
+            rechazarModal.addEventListener('show.bs.modal', function (event) {
+                const id = event.relatedTarget.getAttribute('data-id');
+                document.getElementById('rechazar_prestamo_id').value = id;
+                document.getElementById('formRechazar').action = `/prestamos/${id}/rechazar`;
+                document.getElementById('observacion').value = '';
+            });
+        }
 
-        // Modal para Devolución
+        // Devolución
         const devolucionModal = document.getElementById('devolucionModal');
-        devolucionModal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const prestamoId = button.getAttribute('data-id');
-            const modalBodyInput = devolucionModal.querySelector('#devolucion_prestamo_id');
-            modalBodyInput.value = prestamoId;
-            document.getElementById('formDevolucion').action = `/prestamos/${prestamoId}/devolucion`;
-            document.getElementById('observacion_devolucion').value = '';
-        });
+        if (devolucionModal) {
+            devolucionModal.addEventListener('show.bs.modal', function (event) {
+                const id = event.relatedTarget.getAttribute('data-id');
+                document.getElementById('devolucion_prestamo_id').value = id;
+                document.getElementById('formDevolucion').action = `/prestamos/${id}/devolucion`;
+                document.getElementById('observacion_devolucion').value = '';
+            });
+        }
     });
 </script>
 {% endblock %}
